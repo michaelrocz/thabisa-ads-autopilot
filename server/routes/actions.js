@@ -77,6 +77,8 @@ router.get('/status', (req, res) => {
     min_spend_inr: parseFloat(process.env.MIN_SPEND_BEFORE_PAUSE || 1000),
     currency: process.env.CURRENCY || 'INR',
     meta_connected: !!process.env.META_ACCESS_TOKEN,
+    meta_account_id: process.env.META_AD_ACCOUNT_ID,
+    meta_page_id: process.env.META_PAGE_ID,
     google_connected: !!process.env.GOOGLE_REFRESH_TOKEN,
     last_audit: scheduler.getLastAuditResult()?.timestamp || null,
     uptime_seconds: Math.floor(process.uptime()),

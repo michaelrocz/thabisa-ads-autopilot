@@ -41,7 +41,7 @@ class LauncherService {
    * CREATE META CAMPAIGN (Advantage+ Shopping / ASC)
    */
   async createMetaCampaign(config) {
-    const { name, budget, text, headline, files = [] } = config;
+    const { name, budget, text, headline, files = [], assets = [] } = config;
     const accountId = process.env.META_AD_ACCOUNT_ID;
     const token = meta.getToken();
 
@@ -74,10 +74,22 @@ class LauncherService {
 
       const adSetId = adSetRes.data.id;
 
-      // 3. Create Ads for each file
+      // 3. Create Ads for each creative (either from pre-uploaded assets or files)
       const adResults = [];
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      const creativesToProcess = assets.length > 0 
+        ? assets.map(a => ({ type: a.type, id: a.id }))
+        : files.map(f => ({ type: f.mimetype.startsWith('video/') ? 'video' : 'image', file: f }));
+
+      for (let i = 0; i < creativesToProcess.length; i++) {
+        const item = creativesToProcess[i];
+        let assetId = item.id;
+
+        // If no ID, upload it now (fallback for smaller files)
+        if (!assetId && item.file) {
+          if (item.type === 'image') assetId = await this.uploadImageToMeta(token, accountId, item.file);
+          else assetId = await this.uploadVideoToMeta(token, accountId, item.file);
+        }
+
         let creativeData = {
           name: `Creative_${name}_${i}`,
           object_story_spec: {
@@ -91,14 +103,12 @@ class LauncherService {
           }
         };
 
-        if (file.mimetype.startsWith('image/')) {
-          const hash = await this.uploadImageToMeta(token, accountId, file);
-          creativeData.object_story_spec.link_data.image_hash = hash;
-        } else if (file.mimetype.startsWith('video/')) {
-          const videoId = await this.uploadVideoToMeta(token, accountId, file);
+        if (item.type === 'image') {
+          creativeData.object_story_spec.link_data.image_hash = assetId;
+        } else if (item.type === 'video') {
           creativeData.object_story_spec.video_data = {
-            video_id: videoId,
-            image_url: 'https://thabisa.shop/placeholder-poster.jpg', // Should be a frame from video
+            video_id: assetId,
+            image_url: 'https://thabisa.shop/placeholder-poster.jpg',
             call_to_action: { type: 'SHOP_NOW' },
             title: headline,
             message: text

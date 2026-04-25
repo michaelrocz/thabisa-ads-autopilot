@@ -7,6 +7,7 @@ const API_BASE = window.location.hostname === 'localhost' || window.location.pro
   : 'https://thabisa-ads-autopilot.vercel.app';
 let liveMode = false;
 let pollInterval = null;
+let serverConfig = null;
 
 // Helper to fetch with per-request token override
 async function apiFetch(url, options = {}) {
@@ -45,6 +46,7 @@ async function checkServerStatus() {
     const res = await apiFetch(`${API_BASE}/api/actions/status`, { signal: AbortSignal.timeout(3000) });
     const data = await res.json();
     liveMode = true;
+    serverConfig = data;
     updateConnectionBadge('LIVE', data);
     updateSetupStatus(data);
   } catch {
@@ -760,6 +762,37 @@ async function generateMagicCopy() {
   }, 1200);
 }
 
+async function uploadFileToMeta(file) {
+  const token = localStorage.getItem('meta_access_token');
+  const accountId = serverConfig?.meta_account_id;
+  if (!token || !accountId) throw new Error("Meta connection details missing");
+
+  const isVideo = file.type.startsWith('video/');
+  const formData = new FormData();
+  
+  if (isVideo) {
+    formData.append('source', file);
+    formData.append('title', file.name);
+    const res = await fetch(`https://graph.facebook.com/v21.0/${accountId}/advideos?access_token=${token}`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    return { type: 'video', id: data.id };
+  } else {
+    formData.append('bytes', file);
+    const res = await fetch(`https://graph.facebook.com/v21.0/${accountId}/adimages?access_token=${token}`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const hash = Object.values(data.images)[0].hash;
+    return { type: 'image', id: hash };
+  }
+}
+
 async function launchCampaign() {
   const name = document.getElementById('launch-name').value;
   const budget = document.getElementById('launch-budget').value;
@@ -767,35 +800,32 @@ async function launchCampaign() {
   const headline = document.getElementById('launch-headline').value;
   const status = document.getElementById('launch-status');
 
-  if (!name || !budget || !text || !headline) {
-    status.innerHTML = '<span style="color:var(--red)">Please fill in all fields</span>';
+  if (!name || !budget || !text || !headline || launchFiles.length === 0) {
+    status.innerHTML = '<span style="color:var(--red)">Please fill in all fields and upload at least one creative</span>';
     return;
   }
 
-  status.innerHTML = '<span class="spin" style="display:inline-block">⚙️</span> Initializing "Gold Standard" deployment...';
+  status.innerHTML = '<span class="spin" style="display:inline-block">⚙️</span> Step 1/2: Uploading large assets directly to Meta...';
   
-  const formData = new FormData();
-  formData.append('name', name);
-  formData.append('budget', budget);
-  formData.append('text', text);
-  formData.append('headline', headline);
-  formData.append('platform', launchPlatform);
-  
-  launchFiles.forEach(file => {
-    formData.append('files', file);
-  });
-
-  // Vercel Serverless Limit Check (4.5MB)
-  const totalSize = launchFiles.reduce((acc, f) => acc + f.size, 0);
-  if (totalSize > 4.5 * 1024 * 1024) {
-    status.innerHTML = `<span style="color:var(--red)">⚠️ Files too large (${(totalSize / 1024 / 1024).toFixed(1)}MB). Vercel limit is 4.5MB. Please remove some files or use smaller versions.</span>`;
-    return;
-  }
-
   try {
+    // Step 1: Direct Upload from Browser to Meta (Bypasses Vercel Limits)
+    const assetResults = [];
+    for (const file of launchFiles) {
+      const result = await uploadFileToMeta(file);
+      assetResults.push(result);
+    }
+
+    status.innerHTML = '<span class="spin" style="display:inline-block">⚙️</span> Step 2/2: Deploying "Gold Standard" campaign structure...';
+
+    // Step 2: Notify Backend to create ads using the Asset IDs
     const res = await apiFetch(`/api/actions/launch-${launchPlatform}`, {
       method: 'POST',
-      body: formData
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        name, budget, text, headline, 
+        platform: launchPlatform,
+        assets: assetResults 
+      })
     });
     
     let data;
@@ -804,11 +834,11 @@ async function launchCampaign() {
       data = await res.json();
     } else {
       const text = await res.text();
-      throw new Error(text.includes("Payload Too Large") ? "Files too large for server (4.5MB limit)" : "Server error: " + text.substring(0, 50));
+      throw new Error("Server error: " + text.substring(0, 50));
     }
 
     if (data.ok) {
-      status.innerHTML = `<span style="color:var(--emerald)">🚀 SUCCESS! ${launchPlatform === 'meta' ? 'Meta ASC' : 'Google PMax'} campaign is live and on autopilot.</span>`;
+      status.innerHTML = `<span style="color:var(--emerald)">🚀 SUCCESS! ${launchPlatform === 'meta' ? 'Meta ASC' : 'Google PMax'} campaign is live with ${assetResults.length} ads.</span>`;
     } else {
       status.innerHTML = `<span style="color:var(--red)">Error: ${data.error}</span>`;
     }
