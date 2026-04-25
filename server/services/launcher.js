@@ -50,26 +50,28 @@ class LauncherService {
     try {
       // 1. Create Campaign (Advantage+ Shopping)
       // Note: ASC campaigns have specific objective and special_ad_categories constraints
-      const campaignRes = await axios.post(`https://graph.facebook.com/v20.0/${accountId}/campaigns`, {
-        name: `PRO_ASC_${name}`,
+      const campaignRes = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/campaigns`, {
+        name: `PRO_SALES_${name}_${Date.now()}`,
         objective: 'OUTCOME_SALES',
-        status: 'PAUSED', // Start paused for safety
-        special_ad_categories: 'NONE',
-        smart_promotion_type: 'AD_SET_LEVEL_OFFER' // One of the flags for ASC
+        status: 'PAUSED',
+        special_ad_categories: ['NONE']
       }, { params: { access_token: token } });
 
       const campaignId = campaignRes.data.id;
 
-      // 2. Create Ad Set (Advantage+ Audience)
-      const adSetRes = await axios.post(`https://graph.facebook.com/v20.0/${accountId}/adsets`, {
-        name: `PRO_ASC_AdSet_${name}`,
+      // 2. Create Ad Set (Standard Audience targeting UAE/India)
+      const adSetRes = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/adsets`, {
+        name: `AdSet_${name}`,
         campaign_id: campaignId,
-        daily_budget: parseInt(budget) * 100, // Meta uses cents
+        daily_budget: parseInt(budget) * 100, 
         billing_event: 'IMPRESSIONS',
         optimization_goal: 'OFFSITE_CONVERSIONS',
         promoted_object: { pixel_id: process.env.META_PIXEL_ID, custom_event_type: 'PURCHASE' },
-        targeting: { geo_locations: { countries: ['IN'] }, publisher_platforms: ['facebook', 'instagram'] },
-        status: 'PAUSED'
+        targeting: { 
+          geo_locations: { countries: ['AE', 'IN'] },
+          publisher_platforms: ['facebook', 'instagram']
+        },
+        status: 'ACTIVE'
       }, { params: { access_token: token } });
 
       const adSetId = adSetRes.data.id;
