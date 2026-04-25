@@ -785,13 +785,28 @@ async function launchCampaign() {
     formData.append('files', file);
   });
 
+  // Vercel Serverless Limit Check (4.5MB)
+  const totalSize = launchFiles.reduce((acc, f) => acc + f.size, 0);
+  if (totalSize > 4.5 * 1024 * 1024) {
+    status.innerHTML = `<span style="color:var(--red)">⚠️ Files too large (${(totalSize / 1024 / 1024).toFixed(1)}MB). Vercel limit is 4.5MB. Please remove some files or use smaller versions.</span>`;
+    return;
+  }
+
   try {
     const res = await apiFetch(`/api/actions/launch-${launchPlatform}`, {
       method: 'POST',
       body: formData
     });
     
-    const data = await res.json();
+    let data;
+    const contentType = res.headers.get("content-type");
+    if (contentType && contentType.indexOf("application/json") !== -1) {
+      data = await res.json();
+    } else {
+      const text = await res.text();
+      throw new Error(text.includes("Payload Too Large") ? "Files too large for server (4.5MB limit)" : "Server error: " + text.substring(0, 50));
+    }
+
     if (data.ok) {
       status.innerHTML = `<span style="color:var(--emerald)">🚀 SUCCESS! ${launchPlatform === 'meta' ? 'Meta ASC' : 'Google PMax'} campaign is live and on autopilot.</span>`;
     } else {
