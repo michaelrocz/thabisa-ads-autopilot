@@ -51,22 +51,21 @@ class LauncherService {
       // 1. Create Campaign (Advantage+ Shopping)
       // Note: ASC campaigns have specific objective and special_ad_categories constraints
       const campaignRes = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/campaigns`, {
-        name: `PRO_SALES_${name}_${Date.now()}`,
+        name: `AUTOPILOT_LAUNCH_${name}_${Date.now()}`,
         objective: 'OUTCOME_SALES',
         status: 'PAUSED',
-        special_ad_categories: ['NONE']
+        special_ad_categories: []
       }, { params: { access_token: token } });
 
       const campaignId = campaignRes.data.id;
 
-      // 2. Create Ad Set (Standard Audience targeting UAE/India)
+      // 2. Create Ad Set (Safe Mode: Optimized for Link Clicks to avoid Pixel errors)
       const adSetRes = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/adsets`, {
         name: `AdSet_${name}`,
         campaign_id: campaignId,
         daily_budget: parseInt(budget) * 100, 
         billing_event: 'IMPRESSIONS',
-        optimization_goal: 'OFFSITE_CONVERSIONS',
-        promoted_object: { pixel_id: process.env.META_PIXEL_ID, custom_event_type: 'PURCHASE' },
+        optimization_goal: 'LINK_CLICKS',
         targeting: { 
           geo_locations: { countries: ['AE', 'IN'] },
           publisher_platforms: ['facebook', 'instagram']
