@@ -133,8 +133,12 @@ class LauncherService {
       return { ok: true, campaignId, adSetId, adIds: adResults };
     } catch (e) {
       const errorMsg = e.response?.data?.error?.message || e.message;
-      logger.error(`Launcher: Meta Creation Failed: ${errorMsg}`);
-      throw new Error(errorMsg);
+      const userMsg = e.response?.data?.error?.error_user_msg || '';
+      const userTitle = e.response?.data?.error?.error_user_title || '';
+      const fullMessage = [userTitle, userMsg, errorMsg].filter(Boolean).join(' - ');
+      
+      logger.error(`Launcher: Meta Creation Failed: ${fullMessage}`);
+      throw new Error(fullMessage);
     }
   }
 
