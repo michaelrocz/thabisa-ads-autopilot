@@ -149,40 +149,40 @@ function getPurchaseCount(actions = []) {
 
 // ── SUMMARY (FOR DASHBOARD) ─────────────────────────────────
 async function getSummary() {
-  const [campaigns, insightsMonth, insights30d] = await Promise.all([
-    getCampaigns(),
-    getInsights('this_month', 'campaign'),
-    getInsights('last_30d', 'campaign')
-  ]);
-
-  const totalSpendMonth = insightsMonth.reduce((s, r) => s + parseFloat(r.spend), 0);
-  const totalRevenueMonth = insightsMonth.reduce((s, r) => s + parseFloat(r.purchase_value), 0);
-  const blendedRoasMonth = totalSpendMonth > 0 ? (totalRevenueMonth / totalSpendMonth) : 0;
-  const totalPurchasesMonth = insightsMonth.reduce((s, r) => s + r.purchases, 0);
-  const avgCppMonth = totalPurchasesMonth > 0 ? totalSpendMonth / totalPurchasesMonth : null;
-  const avgFrequency = insightsMonth.reduce((s, r) => s + r.frequency, 0) / (insightsMonth.length || 1);
-
-  const flagged = insightsMonth.filter(r => r.flags.length > 0);
-  const healthy = insightsMonth.filter(r => r.health_status === 'HEALTHY').length;
-  const critical = insightsMonth.filter(r => r.health_status === 'CRITICAL').length;
+  const insights = await getInsights('this_month', 'campaign');
+  const campaigns = await getCampaigns();
+  
+  // Only count campaigns that are actually ACTIVE in Meta
+  const trulyActive = campaigns.filter(c => c.status === 'ACTIVE');
+  
+  const totalSpend = insights.reduce((sum, r) => sum + parseFloat(r.spend), 0);
+  const totalRevenue = insights.reduce((sum, r) => sum + parseFloat(r.purchase_value), 0);
+  const roas = totalSpend > 0 ? (totalRevenue / totalSpend) : 0;
+  const purchases = insights.reduce((sum, r) => sum + r.purchases, 0);
+  const avgCpp = purchases > 0 ? totalSpend / purchases : null;
+  const avgFrequency = insights.length > 0 ? (insights.reduce((sum, r) => sum + r.frequency, 0) / insights.length) : 0;
+  
+  const flagged = insights.filter(r => r.flags.length > 0);
+  const healthyCount = insights.filter(r => r.health_status === 'HEALTHY').length;
+  const criticalCount = insights.filter(r => r.health_status === 'CRITICAL').length;
 
   return {
     platform: 'meta',
     account_id: ACCOUNT_ID,
     currency: process.env.CURRENCY || 'INR',
     period: 'this_month',
-    total_spend: parseFloat(totalSpendMonth.toFixed(2)),
-    total_revenue: parseFloat(totalRevenueMonth.toFixed(2)),
-    blended_roas: parseFloat(blendedRoasMonth.toFixed(2)),
-    total_purchases: totalPurchasesMonth,
-    avg_cpp: avgCppMonth ? parseFloat(avgCppMonth.toFixed(2)) : null,
+    total_spend: parseFloat(totalSpend.toFixed(2)),
+    total_revenue: parseFloat(totalRevenue.toFixed(2)),
+    blended_roas: parseFloat(roas.toFixed(2)),
+    total_purchases: purchases,
+    avg_cpp: avgCpp ? parseFloat(avgCpp.toFixed(2)) : null,
     avg_frequency: parseFloat(avgFrequency.toFixed(2)),
-    active_campaigns: campaigns.filter(c => c.status === 'ACTIVE').length,
+    active_campaigns: trulyActive.length,
     total_campaigns: campaigns.length,
-    health: { healthy, critical, watch: insightsMonth.length - healthy - critical },
+    health: { healthy: healthyCount, critical: criticalCount, watch: insights.length - healthyCount - criticalCount },
     flagged_count: flagged.length,
     flagged,
-    campaigns_detail: insightsMonth.map(row => {
+    campaigns_detail: insights.map(row => {
       const campaign = campaigns.find(c => c.id === row.campaign_id);
       return {
         ...row,
