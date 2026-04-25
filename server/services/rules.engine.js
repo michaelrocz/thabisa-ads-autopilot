@@ -69,7 +69,7 @@ async function runMetaRules() {
 
     // ── SCALE TRIGGER: ROAS ≥ 3× for 3 consecutive days
     if (consecutiveDaysAboveTarget(campaign.campaign_id, TARGET_ROAS)) {
-      const currentBudget = 500; // TODO: pull real budget from getCampaigns()
+      const currentBudget = campaign.daily_budget || 500;
       logger.info(`Scale trigger: ${campaign.campaign_name} — ROAS ${campaign.roas}× for 3+ days`);
       const result = await metaService.scaleBudget(
         campaign.campaign_id, currentBudget,
@@ -78,17 +78,20 @@ async function runMetaRules() {
       actions.push({ type: 'SCALE_BUDGET', campaign: campaign.campaign_name, roas: campaign.roas, result });
     }
 
-    // ── PAUSE TRIGGER: CPP > 2× target after min spend
-    if (campaign.cpp && campaign.cpp > TARGET_CPP * 2 && parseFloat(campaign.spend) >= MIN_SPEND) {
-      logger.info(`Pause trigger: ${campaign.campaign_name} — CPP ₹${campaign.cpp} > 2× target ₹${TARGET_CPP * 2}`);
+    // ── PAUSE TRIGGER: CPP > 2× target OR (0 purchases AND spend > 2× target)
+    const currentSpend = parseFloat(campaign.spend);
+    const effectiveCpp = campaign.cpp ? parseFloat(campaign.cpp) : (campaign.purchases === 0 ? currentSpend : 0);
+    
+    if (effectiveCpp > TARGET_CPP * 2 && currentSpend >= MIN_SPEND) {
+      logger.info(`Pause trigger: ${campaign.campaign_name} — Effective CPP ₹${effectiveCpp.toFixed(2)} > 2× target ₹${TARGET_CPP * 2}`);
       // For campaign-level: get ad sets and pause each
       const adSets = await metaService.getAdSets(campaign.campaign_id);
       for (const adSet of adSets.filter(a => a.status === 'ACTIVE')) {
         const result = await metaService.pauseAdSet(
           adSet.id,
-          `CPP ₹${campaign.cpp} exceeds 2× target ₹${TARGET_CPP * 2} with spend ₹${campaign.spend} ≥ min ₹${MIN_SPEND}`
+          `Effective CPP ₹${effectiveCpp.toFixed(2)} exceeds 2× target ₹${TARGET_CPP * 2} with spend ₹${currentSpend} ≥ min ₹${MIN_SPEND}`
         );
-        actions.push({ type: 'PAUSE_AD_SET', adset: adSet.name, cpp: campaign.cpp, result });
+        actions.push({ type: 'PAUSE_AD_SET', adset: adSet.name, cpp: effectiveCpp, result });
       }
     }
 

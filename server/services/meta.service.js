@@ -174,7 +174,13 @@ async function getSummary() {
     health: { healthy, critical, watch: insights7d.length - healthy - critical },
     flagged_count: flagged.length,
     flagged,
-    campaigns_detail: insights7d
+    campaigns_detail: insights7d.map(row => {
+      const campaign = campaigns.find(c => c.id === row.campaign_id);
+      return {
+        ...row,
+        daily_budget: campaign ? (parseFloat(campaign.daily_budget || campaign.lifetime_budget || 0) / 100) : 0
+      };
+    })
   };
 }
 
