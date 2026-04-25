@@ -7,10 +7,10 @@
     }
   ],
   "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/api/index.js"
-    }
+    { "handle": "filesystem" },
+    { "src": "/api/(.*)", "dest": "/api/index.js" },
+    { "src": "/auth/(.*)", "dest": "/api/index.js" },
+    { "src": "/", "dest": "/index.html" }
   ],
   "crons": [
     {
@@ -25,8 +25,5 @@
       "path": "/api/actions/audit",
       "schedule": "30 3 * * 1"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }
