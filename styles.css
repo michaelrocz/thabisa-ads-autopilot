@@ -565,6 +565,38 @@ body {
 .mb-8 { margin-bottom: 8px; }
 .mb-16 { margin-bottom: 16px; }
 .mb-24 { margin-bottom: 24px; }
+.input-premium {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 10px 14px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  transition: border-color 0.2s;
+}
+.input-premium:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.upload-zone:hover {
+  background: rgba(255,255,255,0.02);
+  border-color: var(--gold);
+}
+
+.w-full { width: 100%; }
+.mb-16 { margin-bottom: 16px; }
+.mb-24 { margin-bottom: 24px; }
 .mb-32 { margin-bottom: 32px; }
 .flex { display: flex; }
 .gap-16 { gap: 16px; }
@@ -604,3 +636,53 @@ body {
   .grid-2, .grid-3, .algo-layers { grid-template-columns: 1fr; }
   .content { padding: 20px 16px; }
 }
+
+/* MODALS */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(10px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+.modal-overlay.active { display: flex; animation: modalFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.modal-card {
+  background: #12111a;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  max-width: 460px;
+  width: 100%;
+  padding: 36px;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.6);
+  position: relative;
+}
+.modal-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.btn-primary {
+  background: var(--gold);
+  color: #000;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: Inter, sans-serif;
+  transition: all 0.2s ease;
+}
+.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(212,168,75,0.4); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary {
+  background: rgba(255,255,255,0.05);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 12px 24px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: Inter, sans-serif;
+  transition: all 0.2s ease;
+}
+.btn-secondary:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+@keyframes modalFadeIn { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }

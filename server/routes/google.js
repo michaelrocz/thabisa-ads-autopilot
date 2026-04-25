@@ -19,10 +19,20 @@ router.get('/test', async (req, res) => {
     const result = await google.testConnection();
     res.json(result);
   } catch (e) {
-    const errMsg = e?.message || JSON.stringify(e) || e?.toString() || 'Unknown';
-    const errDetails = e?.errors || e?.failure || e?.details || null;
-    console.error('[GOOGLE TEST ERROR]', errMsg, JSON.stringify(errDetails));
-    res.status(500).json({ ok: false, error: errMsg, details: errDetails, customer_id_used: process.env.GOOGLE_CUSTOMER_ID });
+    const errMsg = e?.message || 'Unknown Error';
+    console.error('[GOOGLE TEST ERROR]', errMsg);
+    
+    // Log the actual Google Ads API error details
+    if (e.errors) {
+      console.error('Google Ads Errors:', JSON.stringify(e.errors, null, 2));
+    }
+    
+    res.status(500).json({ 
+      ok: false, 
+      error: errMsg, 
+      details: e.errors || null,
+      customer_id_used: process.env.GOOGLE_CUSTOMER_ID 
+    });
   }
 });
 

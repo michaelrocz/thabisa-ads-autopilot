@@ -5,6 +5,7 @@
 const logger = require('../utils/logger');
 const metaService = require('./meta.service');
 const googleService = require('./google.service');
+const notifier = require('./notifier');
 
 const TARGET_ROAS = parseFloat(process.env.TARGET_ROAS || 3.0);
 const TARGET_CPP = parseFloat(process.env.TARGET_CPP || 2500);
@@ -30,11 +31,16 @@ function consecutiveDaysAboveTarget(id, targetRoas, days = 3) {
 
 // ── ALERT SINK ───────────────────────────────────────────────
 const alerts = []; // In-memory alert queue (served via /api/actions/alerts)
-function pushAlert(level, message, data = {}) {
+async function pushAlert(level, message, data = {}) {
   const alert = { level, message, data, timestamp: new Date().toISOString(), read: false };
   alerts.unshift(alert);
   if (alerts.length > 100) alerts.pop(); // keep last 100
   logger.warn(`[ALERT][${level}] ${message}`, data);
+
+  // Send Email for CRITICAL or WARNING alerts
+  if (level === 'CRITICAL' || level === 'WARNING') {
+    await notifier.sendAlert(level, message, data);
+  }
 }
 function getAlerts() { return alerts; }
 function markAlertsRead() { alerts.forEach(a => a.read = true); }
@@ -48,7 +54,7 @@ async function runMetaRules() {
   try {
     summary = await metaService.getSummary();
   } catch (err) {
-    pushAlert('CRITICAL', `Meta API connection failed: ${err.message}`);
+    await pushAlert('CRITICAL', `Meta API connection failed: ${err.message}`);
     return { error: err.message, actions };
   }
 
@@ -59,7 +65,7 @@ async function runMetaRules() {
     if (lastFired) {
       const hoursSince = (Date.now() - new Date(lastFired).getTime()) / 3600000;
       if (hoursSince > 2) {
-        pushAlert('CRITICAL', `Meta Pixel not fired in ${hoursSince.toFixed(1)} hours!`, { pixel_id: pixel[0].id });
+        await pushAlert('CRITICAL', `Meta Pixel not fired in ${hoursSince.toFixed(1)} hours!`, { pixel_id: pixel[0].id });
       }
     }
   }
@@ -94,6 +100,15 @@ async function runMetaRules() {
         actions.push({ type: 'PAUSE_AD_SET', adset: adSet.name, cpp: effectiveCpp, result });
       }
     }
+    // ── EFFICIENCY TRIGGER: ROAS is decent but below target — scale down
+    else if (campaign.roas >= 1.5 && campaign.roas < 2.5 && currentSpend >= MIN_SPEND) {
+      const currentBudget = campaign.daily_budget || 500;
+      const result = await metaService.decreaseBudget(
+        campaign.campaign_id, currentBudget,
+        `ROAS ${campaign.roas}× is below target ${TARGET_ROAS}× — down-scaling for efficiency`
+      );
+      actions.push({ type: 'DECREASE_BUDGET', campaign: campaign.campaign_name, roas: campaign.roas, result });
+    }
 
     // ── ALERT TRIGGER: ROAS drops > 40%
     const history = roasHistory[campaign.campaign_id] || [];
@@ -101,7 +116,7 @@ async function runMetaRules() {
       const prev = history[history.length - 2].roas;
       const curr = history[history.length - 1].roas;
       if (prev > 0 && (prev - curr) / prev > 0.4) {
-        pushAlert('CRITICAL', `ROAS dropped ${(((prev - curr) / prev) * 100).toFixed(0)}% in 48h for: ${campaign.campaign_name}`, {
+        await pushAlert('CRITICAL', `ROAS dropped ${(((prev - curr) / prev) * 100).toFixed(0)}% in 48h for: ${campaign.campaign_name}`, {
           campaign_id: campaign.campaign_id, previous_roas: prev, current_roas: curr
         });
       }
@@ -109,22 +124,40 @@ async function runMetaRules() {
 
     // ── ALERT TRIGGER: CRITICAL health
     if (campaign.health_status === 'CRITICAL') {
-      pushAlert('WARNING', `Campaign CRITICAL: ${campaign.campaign_name} — ROAS ${campaign.roas}×`, {
+      await pushAlert('WARNING', `Campaign CRITICAL: ${campaign.campaign_name} — ROAS ${campaign.roas}×`, {
         campaign_id: campaign.campaign_id, spend: campaign.spend, cpp: campaign.cpp
       });
     }
 
     // ── REFRESH TRIGGER: Frequency > 3.5
     if (campaign.frequency > 3.5) {
-      pushAlert('INFO', `Creative refresh needed: ${campaign.campaign_name} — frequency ${campaign.frequency}`, {
+      await pushAlert('INFO', `Creative refresh needed: ${campaign.campaign_name} — frequency ${campaign.frequency}`, {
         campaign_id: campaign.campaign_id
       });
       actions.push({ type: 'CREATIVE_REFRESH_FLAG', campaign: campaign.campaign_name, frequency: campaign.frequency });
     }
 
-    // ── REFRESH TRIGGER: CTR < 0.8%
-    if (campaign.ctr < 0.8 && campaign.frequency > 2) {
-      actions.push({ type: 'CREATIVE_FATIGUE_FLAG', campaign: campaign.campaign_name, ctr: campaign.ctr, frequency: campaign.frequency });
+    // ── AUDIENCE BURN PROTECTION: Frequency > 3.5
+    if (campaign.frequency > 3.5) {
+      if (campaign.roas < 2.0) {
+        logger.info(`Audience Burn: ${campaign.campaign_name} — Frequency ${campaign.frequency} with low ROAS. Suggesting audience refresh.`);
+        pushAlert('WARNING', `Audience Burn on ${campaign.campaign_name}: Frequency is ${campaign.frequency}. ROAS is dipping. Refresh targeting.`);
+      }
+    }
+
+    // ── CPM SPIKE MONITOR: Flag if CPM is unusually high (> ₹1500)
+    if (campaign.cpm > 1500) {
+      pushAlert('INFO', `High CPM Alert: ${campaign.campaign_name} is running at ₹${campaign.cpm} CPM. Monitor delivery costs.`);
+    }
+
+    // ── LOW PERFORMANCE KILLSWITCH (General)
+    if (currentSpend > 1500 && campaign.purchases === 0 && campaign.roas === 0) {
+       logger.info(`Killswitch Trigger: ${campaign.campaign_name} — ₹${currentSpend} spend with 0 sales.`);
+       pushAlert('CRITICAL', `Killswitch Activated: ${campaign.campaign_name} paused after ₹${currentSpend} spend with 0 sales.`);
+       const adSets = await metaService.getAdSets(campaign.campaign_id);
+       for (const adSet of adSets.filter(a => a.status === 'ACTIVE')) {
+         await metaService.pauseAdSet(adSet.id, 'Killswitch: Zero sales high spend');
+       }
     }
   }
 
@@ -161,7 +194,7 @@ async function runGoogleRules() {
   try {
     summary = await googleService.getSummary();
   } catch (err) {
-    pushAlert('CRITICAL', `Google Ads API error: ${err.message}`);
+    await pushAlert('CRITICAL', `Google Ads API error: ${err.message}`);
     return { error: err.message, actions };
   }
 
@@ -187,7 +220,7 @@ async function runGoogleRules() {
 
     // ── ALERT TRIGGER: CRITICAL
     if (campaign.health_status === 'CRITICAL') {
-      pushAlert('WARNING', `Google Campaign CRITICAL: ${campaign.campaign_name} — ROAS ${campaign.roas}×`, campaign);
+      await pushAlert('WARNING', `Google Campaign CRITICAL: ${campaign.campaign_name} — ROAS ${campaign.roas}×`, campaign);
     }
   }
 

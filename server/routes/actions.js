@@ -3,6 +3,10 @@ const express = require('express');
 const router = express.Router();
 const rulesEngine = require('../services/rules.engine');
 const scheduler = require('../services/scheduler');
+const meta = require('../services/meta.service');
+const google = require('../services/google.service');
+const launcher = require('../services/launcher');
+const logger = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
 
@@ -72,6 +76,53 @@ router.get('/status', (req, res) => {
     uptime_seconds: Math.floor(process.uptime()),
     node_env: process.env.NODE_ENV
   });
+});
+
+// POST /api/actions/update-token — update Meta token dynamically
+router.post('/update-token', (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ error: 'Token is required' });
+  
+  // Update in-memory for the current process
+  process.env.META_ACCESS_TOKEN = token;
+  
+  // Also try to update .env file if it exists (for local dev)
+  try {
+    const envPath = path.join(__dirname, '../../.env');
+    if (fs.existsSync(envPath)) {
+      let content = fs.readFileSync(envPath, 'utf8');
+      if (content.includes('META_ACCESS_TOKEN=')) {
+        content = content.replace(/META_ACCESS_TOKEN=.*/, `META_ACCESS_TOKEN=${token}`);
+      } else {
+        content += `\nMETA_ACCESS_TOKEN=${token}`;
+      }
+      fs.writeFileSync(envPath, content);
+    }
+  } catch (e) {
+    console.error('Failed to update .env file:', e.message);
+  }
+
+  res.json({ ok: true, message: 'Meta token updated successfully for the current session.' });
+});
+
+// POST /api/actions/launch-meta — One-click launch
+router.post('/launch-meta', async (req, res) => {
+  try {
+    const result = await launcher.createMetaCampaign(req.body);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// POST /api/actions/launch-google — One-click launch
+router.post('/launch-google', async (req, res) => {
+  try {
+    const result = await launcher.createGoogleCampaign(req.body);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 module.exports = router;

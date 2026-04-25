@@ -6,6 +6,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const logger = require('./utils/logger');
+const { metaTokenStorage } = require('./services/meta.service');
 
 const app = express();
 
@@ -18,6 +19,16 @@ app.use(express.static(projectRoot, { index: 'index.html' }));
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Token-persistence middleware (header override)
+app.use((req, res, next) => {
+  const token = req.headers['x-meta-token'];
+  if (token) {
+    metaTokenStorage.run(token, () => next());
+  } else {
+    next();
+  }
+});
 
 app.use((req, res, next) => {
   if (req.path !== '/api/actions/status') {

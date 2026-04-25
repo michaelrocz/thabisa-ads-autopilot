@@ -25,6 +25,9 @@
     <div class="nav-item active" onclick="showSection('dashboard',this)" id="nav-dashboard">
       <i data-lucide="layout-dashboard"></i> Dashboard
     </div>
+    <div class="nav-item" onclick="showSection('launch',this)" id="nav-launch">
+      <i data-lucide="rocket"></i> Launch Pro
+    </div>
     <div class="nav-section-label">Targeting</div>
     <div class="nav-item" onclick="showSection('segments',this)" id="nav-segments">
       <i data-lucide="users"></i> Audience Segments
@@ -184,6 +187,63 @@
       </div>
     </div>
 
+    <!-- ═══════════════ LAUNCH PRO ═══════════════ -->
+    <div class="section" id="section-launch">
+      <div class="section-label">Campaign Creator</div>
+      <h1 class="page-title">🚀 Launch Pro</h1>
+      <p class="page-subtitle">Deploy "Gold Standard" campaigns in seconds. Select a platform, upload your creative, and let the AI handle the rest.</p>
+      
+      <div class="platform-tabs mb-24">
+        <div class="platform-tab active" onclick="setLaunchPlatform('meta',this)">Meta Ads</div>
+        <div class="platform-tab" onclick="setLaunchPlatform('google',this)">Google Ads</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="section-label mb-16">1. Campaign Essentials</div>
+          <div class="mb-16">
+            <label class="stat-label" style="display:block;margin-bottom:8px">Campaign Name</label>
+            <input type="text" id="launch-name" class="input-premium" placeholder="e.g. Yellow Collection — May 2026">
+          </div>
+          <div class="mb-16">
+            <label class="stat-label" style="display:block;margin-bottom:8px">Daily Budget (₹)</label>
+            <input type="number" id="launch-budget" class="input-premium" value="1500">
+          </div>
+          <div class="section-label mb-16" style="margin-top:24px">2. Creative Assets</div>
+          <div class="mb-16">
+            <label class="stat-label" style="display:block;margin-bottom:8px">Upload Product Photo/Video</label>
+            <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+              <i data-lucide="upload-cloud" style="width:32px;height:32px;color:var(--text-dim)"></i>
+              <p style="margin-top:8px;font-size:0.75rem;color:var(--text-muted)">Click or drag file to upload</p>
+              <input type="file" id="file-input" style="display:none" onchange="handleFileUpload(this)">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-label mb-16">3. Ad Content (AI Assisted)</div>
+          <div class="mb-16">
+            <label class="stat-label" style="display:block;margin-bottom:8px">Primary Text / Description</label>
+            <textarea id="launch-text" class="input-premium" style="height:100px" placeholder="Write something or use Magic Copy..."></textarea>
+          </div>
+          <div class="mb-16">
+            <label class="stat-label" style="display:block;margin-bottom:8px">Headline</label>
+            <input type="text" id="launch-headline" class="input-premium" placeholder="e.g. Elevate Your Home Design">
+          </div>
+          <button class="btn-secondary w-full mb-16" onclick="generateMagicCopy()">
+            <i data-lucide="sparkles" style="width:14px;height:14px"></i> Magic Copy
+          </button>
+          
+          <div class="divider"></div>
+          
+          <button class="btn-primary w-full" id="btn-launch" onclick="launchCampaign()">
+            <i data-lucide="rocket" style="width:16px;height:16px"></i> Launch Perfect Campaign
+          </button>
+          <p id="launch-status" style="margin-top:12px;font-size:0.7rem;text-align:center;color:var(--text-muted)"></p>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══════════════ SEGMENTS ═══════════════ -->
     <div class="section" id="section-segments">
       <div class="section-label">Targeting</div>
@@ -261,6 +321,23 @@
 
   </div><!-- /content -->
 </main>
+
+<!-- TOKEN EXPIRED MODAL -->
+<div id="token-modal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <i data-lucide="alert-circle" style="color:var(--red);width:32px;height:32px"></i>
+      <h2 style="margin:0;font-family:Playfair Display,serif">Meta Token Expired</h2>
+    </div>
+    <p style="color:var(--text-muted);font-size:0.9rem;line-height:1.5">Your autopilot has paused because the Meta connection is lost. Please provide a new <b>Permanent System User Token</b> to resume monitoring.</p>
+    <input type="text" id="new-token-input" placeholder="Paste new token here..." style="width:100%;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text);margin:16px 0;font-family:monospace;font-size:0.8rem">
+    <div style="display:flex;gap:12px">
+      <button class="btn-primary" onclick="updateToken()" id="btn-update-token" style="flex:1">Update Token & Resume</button>
+      <button class="btn-secondary" onclick="closeTokenModal()" style="width:100px">Later</button>
+    </div>
+    <p id="token-status" style="margin-top:12px;font-size:0.75rem;text-align:center"></p>
+  </div>
+</div>
 
 <script src="data.js"></script>
 <script src="app.js"></script>

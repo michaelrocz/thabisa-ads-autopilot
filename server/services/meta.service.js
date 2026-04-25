@@ -2,17 +2,23 @@
 // THABISA ADS AUTOPILOT — META MARKETING API SERVICE
 // ============================================================
 const axios = require('axios');
+const { AsyncLocalStorage } = require('async_hooks');
 const logger = require('../utils/logger');
 
+const metaTokenStorage = new AsyncLocalStorage();
+
 const BASE_URL = `https://graph.facebook.com/${process.env.META_API_VERSION || 'v21.0'}`;
-const TOKEN = process.env.META_ACCESS_TOKEN;
 const ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID; // act_XXXXXXXX
 const DRY_RUN = process.env.DRY_RUN !== 'false';
 
 // ── HELPERS ─────────────────────────────────────────────────
+function getToken() {
+  return metaTokenStorage.getStore() || process.env.META_ACCESS_TOKEN;
+}
+
 function api(endpoint, params = {}) {
   return axios.get(`${BASE_URL}${endpoint}`, {
-    params: { access_token: TOKEN, ...params }
+    params: { access_token: getToken(), ...params }
   }).then(r => r.data).catch(err => {
     const msg = err.response?.data?.error?.message || err.message;
     logger.error(`Meta API error: ${msg}`, { endpoint });
@@ -26,7 +32,7 @@ function apiPost(endpoint, data = {}) {
     return Promise.resolve({ id: 'dry_run', dry_run: true });
   }
   return axios.post(`${BASE_URL}${endpoint}`, null, {
-    params: { access_token: TOKEN, ...data }
+    params: { access_token: getToken(), ...data }
   }).then(r => r.data).catch(err => {
     const msg = err.response?.data?.error?.message || err.message;
     logger.error(`Meta API POST error: ${msg}`, { endpoint });
@@ -141,43 +147,44 @@ function getPurchaseCount(actions = []) {
 
 // ── SUMMARY (FOR DASHBOARD) ─────────────────────────────────
 async function getSummary() {
-  const [campaigns, insights7d, insights30d] = await Promise.all([
+  const [campaigns, insightsMonth, insights30d] = await Promise.all([
     getCampaigns(),
-    getInsights('last_7d', 'campaign'),
+    getInsights('this_month', 'campaign'),
     getInsights('last_30d', 'campaign')
   ]);
 
-  const totalSpend7d = insights7d.reduce((s, r) => s + parseFloat(r.spend), 0);
-  const totalRevenue7d = insights7d.reduce((s, r) => s + parseFloat(r.purchase_value), 0);
-  const blendedRoas7d = totalSpend7d > 0 ? (totalRevenue7d / totalSpend7d) : 0;
-  const totalPurchases7d = insights7d.reduce((s, r) => s + r.purchases, 0);
-  const avgCpp7d = totalPurchases7d > 0 ? totalSpend7d / totalPurchases7d : null;
-  const avgFrequency = insights7d.reduce((s, r) => s + r.frequency, 0) / (insights7d.length || 1);
+  const totalSpendMonth = insightsMonth.reduce((s, r) => s + parseFloat(r.spend), 0);
+  const totalRevenueMonth = insightsMonth.reduce((s, r) => s + parseFloat(r.purchase_value), 0);
+  const blendedRoasMonth = totalSpendMonth > 0 ? (totalRevenueMonth / totalSpendMonth) : 0;
+  const totalPurchasesMonth = insightsMonth.reduce((s, r) => s + r.purchases, 0);
+  const avgCppMonth = totalPurchasesMonth > 0 ? totalSpendMonth / totalPurchasesMonth : null;
+  const avgFrequency = insightsMonth.reduce((s, r) => s + r.frequency, 0) / (insightsMonth.length || 1);
 
-  const flagged = insights7d.filter(r => r.flags.length > 0);
-  const healthy = insights7d.filter(r => r.health_status === 'HEALTHY').length;
-  const critical = insights7d.filter(r => r.health_status === 'CRITICAL').length;
+  const flagged = insightsMonth.filter(r => r.flags.length > 0);
+  const healthy = insightsMonth.filter(r => r.health_status === 'HEALTHY').length;
+  const critical = insightsMonth.filter(r => r.health_status === 'CRITICAL').length;
 
   return {
     platform: 'meta',
     account_id: ACCOUNT_ID,
     currency: process.env.CURRENCY || 'INR',
-    period: 'last_7d',
-    total_spend: parseFloat(totalSpend7d.toFixed(2)),
-    total_revenue: parseFloat(totalRevenue7d.toFixed(2)),
-    blended_roas: parseFloat(blendedRoas7d.toFixed(2)),
-    total_purchases: totalPurchases7d,
-    avg_cpp: avgCpp7d ? parseFloat(avgCpp7d.toFixed(2)) : null,
+    period: 'this_month',
+    total_spend: parseFloat(totalSpendMonth.toFixed(2)),
+    total_revenue: parseFloat(totalRevenueMonth.toFixed(2)),
+    blended_roas: parseFloat(blendedRoasMonth.toFixed(2)),
+    total_purchases: totalPurchasesMonth,
+    avg_cpp: avgCppMonth ? parseFloat(avgCppMonth.toFixed(2)) : null,
     avg_frequency: parseFloat(avgFrequency.toFixed(2)),
     active_campaigns: campaigns.filter(c => c.status === 'ACTIVE').length,
     total_campaigns: campaigns.length,
-    health: { healthy, critical, watch: insights7d.length - healthy - critical },
+    health: { healthy, critical, watch: insightsMonth.length - healthy - critical },
     flagged_count: flagged.length,
     flagged,
-    campaigns_detail: insights7d.map(row => {
+    campaigns_detail: insightsMonth.map(row => {
       const campaign = campaigns.find(c => c.id === row.campaign_id);
       return {
         ...row,
+        status: campaign ? campaign.status : 'UNKNOWN',
         daily_budget: campaign ? (parseFloat(campaign.daily_budget || campaign.lifetime_budget || 0) / 100) : 0
       };
     })
@@ -206,6 +213,34 @@ async function scaleBudget(campaignId, currentBudget, reason) {
   return apiPost(`/${campaignId}`, { daily_budget: newBudget });
 }
 
+async function decreaseBudget(campaignId, currentBudget, reason) {
+  const newBudget = Math.max(500, Math.round(currentBudget * 0.90)); // -10%, min 500
+  logger.logAction({
+    platform: 'META', objectId: campaignId, action: 'DECREASE_BUDGET',
+    reason, oldValue: currentBudget, newValue: newBudget
+  });
+  if (DRY_RUN) return { dry_run: true, action: 'DECREASE_BUDGET', id: campaignId, old: currentBudget, new: newBudget };
+  return apiPost(`/${campaignId}`, { daily_budget: newBudget });
+}
+
+async function updateAdSetTargeting(adSetId, targeting) {
+  logger.logAction({
+    platform: 'META', objectId: adSetId, action: 'UPDATE_TARGETING',
+    reason: 'Audience optimization', newValue: targeting
+  });
+  if (DRY_RUN) return { dry_run: true, action: 'UPDATE_TARGETING', id: adSetId };
+  return apiPost(`/${adSetId}`, { targeting: JSON.stringify(targeting) });
+}
+
+async function updateStatus(objectId, status) {
+  logger.logAction({
+    platform: 'META', objectId, action: 'UPDATE_STATUS',
+    reason: 'Manual activation/pause', newValue: status
+  });
+  if (DRY_RUN) return { dry_run: true, action: 'UPDATE_STATUS', id: objectId, status };
+  return apiPost(`/${objectId}`, { status });
+}
+
 async function pauseAd(adId, reason) {
   logger.logAction({
     platform: 'META', objectId: adId, action: 'PAUSE_AD',
@@ -229,5 +264,7 @@ async function getPixelHealth() {
 
 module.exports = {
   testConnection, getCampaigns, getAdSets, getInsights,
-  getSummary, pauseAdSet, scaleBudget, pauseAd, getPixelHealth
+  getSummary, pauseAdSet, scaleBudget, decreaseBudget, 
+  updateAdSetTargeting, updateStatus, pauseAd, getPixelHealth,
+  metaTokenStorage
 };

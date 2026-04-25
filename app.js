@@ -8,6 +8,15 @@ const API_BASE = window.location.hostname === 'localhost' || window.location.pro
 let liveMode = false;
 let pollInterval = null;
 
+// Helper to fetch with per-request token override
+async function apiFetch(url, options = {}) {
+  const token = localStorage.getItem('meta_access_token');
+  if (token) {
+    options.headers = { ...options.headers, 'x-meta-token': token };
+  }
+  return fetch(url, options);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   lucide.createIcons();
   buildSegments();
@@ -33,7 +42,7 @@ async function initLiveData() {
 
 async function checkServerStatus() {
   try {
-    const res = await fetch(`${API_BASE}/api/actions/status`, { signal: AbortSignal.timeout(3000) });
+    const res = await apiFetch(`${API_BASE}/api/actions/status`, { signal: AbortSignal.timeout(3000) });
     const data = await res.json();
     liveMode = true;
     updateConnectionBadge('LIVE', data);
@@ -75,17 +84,78 @@ function updateSetupStatus(data) {
 async function fetchDashboardData() {
   try {
     const [metaRes, alertsRes] = await Promise.allSettled([
-      fetch(`${API_BASE}/api/meta/summary`).then(r => r.json()),
-      fetch(`${API_BASE}/api/actions/alerts`).then(r => r.json())
+      apiFetch(`${API_BASE}/api/meta/summary`).then(r => r.json()),
+      apiFetch(`${API_BASE}/api/actions/alerts`).then(r => r.json())
     ]);
-    if (metaRes.status === 'fulfilled' && !metaRes.value.error) {
-      updateDashboard(metaRes.value);
+    if (metaRes.status === 'fulfilled') {
+      if (metaRes.value.error) {
+        showTokenModal(metaRes.value.error);
+      } else {
+        updateDashboard(metaRes.value);
+      }
     }
     if (alertsRes.status === 'fulfilled') {
       updateAlertBadge(alertsRes.value);
     }
   } catch (e) {
     console.warn('Live data fetch failed:', e.message);
+  }
+}
+
+// ── TOKEN MODAL CONTROLS ─────────────────────────────────────
+function showTokenModal(errorMsg) {
+  const modal = document.getElementById('token-modal');
+  const status = document.getElementById('token-status');
+  if (modal) modal.classList.add('active');
+  if (errorMsg && status) {
+    status.innerHTML = `<span style="color:var(--red);font-size:0.7rem">Meta Error: ${errorMsg}</span>`;
+  }
+}
+
+function closeTokenModal() {
+  const modal = document.getElementById('token-modal');
+  if (modal) modal.classList.remove('active');
+}
+
+async function updateToken() {
+  const input = document.getElementById('new-token-input');
+  const btn = document.getElementById('btn-update-token');
+  const status = document.getElementById('token-status');
+  const token = input.value.trim();
+
+  if (!token) {
+    status.textContent = 'Please paste a token first';
+    status.style.color = 'var(--red)';
+    return;
+  }
+
+  btn.textContent = 'Updating...';
+  btn.disabled = true;
+
+  try {
+    const res = await apiFetch(`${API_BASE}/api/actions/update-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      status.textContent = '✅ Success! Refreshing...';
+      status.style.color = 'var(--emerald-light)';
+      localStorage.setItem('meta_access_token', token);
+      setTimeout(() => {
+        closeTokenModal();
+        location.reload(); 
+      }, 800);
+    } else {
+      throw new Error(data.error || 'Failed to update');
+    }
+  } catch (e) {
+    status.textContent = '❌ Error: ' + e.message;
+    status.style.color = 'var(--red)';
+  } finally {
+    btn.textContent = 'Update Token & Resume';
+    btn.disabled = false;
   }
 }
 
@@ -132,24 +202,41 @@ function renderCampaignTable(campaigns) {
     container = document.getElementById('live-campaign-table');
   }
 
-  const headers = ['Campaign', 'Spend (₹)', 'ROAS', 'CPP (₹)', 'CTR%', 'Freq', 'Purchases', 'Status'];
+  const headers = ['Campaign', 'Spend (₹)', 'ROAS', 'CPP (₹)', 'CTR%', 'Freq', 'Purchases', 'Health'];
   const headerRow = `<thead><tr>${headers.map(h =>
     `<th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);color:var(--text-muted);font-weight:600;font-size:0.67rem;text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap">${h}</th>`
   ).join('')}</tr></thead>`;
 
   const healthColor = { HEALTHY: 'var(--emerald-light)', WATCH: 'var(--amber)', CRITICAL: 'var(--red)' };
-  const rows = campaigns.slice(0, 15).map(c => {
+  const sorted = [...campaigns].sort((a, b) => {
+    if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') return -1;
+    if (a.status !== 'ACTIVE' && b.status === 'ACTIVE') return 1;
+    // secondary sort by spend
+    return parseFloat(b.spend) - parseFloat(a.spend);
+  });
+
+  const rows = sorted.slice(0, 15).map(c => {
     const col = healthColor[c.health_status] || 'var(--text-muted)';
     const flags = c.flags?.length ? `<span title="${c.flags.join(', ')}" style="color:var(--amber);margin-left:4px">⚠</span>` : '';
-    return `<tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:9px 12px;color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.campaign_name}">${c.campaign_name}</td>
-      <td style="padding:9px 12px;color:var(--text-muted)">₹${formatNumber(c.spend)}</td>
-      <td style="padding:9px 12px;font-weight:700;color:${c.roas >= 3 ? 'var(--emerald-light)' : c.roas >= 1.5 ? 'var(--amber)' : 'var(--red)'}">${c.roas}×</td>
-      <td style="padding:9px 12px;color:var(--text-muted)">${c.cpp ? '₹'+c.cpp : '—'}</td>
-      <td style="padding:9px 12px;color:${c.ctr < 0.8 ? 'var(--red)' : 'var(--text-muted)'}">${c.ctr}%</td>
-      <td style="padding:9px 12px;color:${c.frequency > 3.5 ? 'var(--red)' : 'var(--text-muted)'}">${c.frequency}</td>
-      <td style="padding:9px 12px;color:var(--text-muted)">${c.purchases}</td>
-      <td style="padding:9px 12px"><span class="topbar-badge" style="background:${col}22;color:${col};border:1px solid ${col}44;padding:2px 8px;border-radius:4px;font-size:0.65rem;font-weight:700">${c.health_status}</span>${flags}</td>
+    const isActive = c.status === 'ACTIVE';
+    const activeStyle = isActive ? 'background:rgba(34,201,151,0.08);border-left:4px solid var(--emerald)' : 'border-left:4px solid transparent';
+    const activeBadge = isActive ? '<span style="background:var(--emerald);color:white;padding:2px 6px;border-radius:4px;font-size:0.6rem;font-weight:800;margin-left:8px;vertical-align:middle">ACTIVE</span>' : '';
+    
+    return `<tr style="border-bottom:1px solid var(--border);${activeStyle}">
+      <td style="padding:12px 12px;color:var(--text);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.campaign_name}">
+        <span style="display:flex;align-items:center;gap:8px">
+          ${isActive ? '<span class="pulse-dot" style="width:8px;height:8px;background:var(--emerald);box-shadow:0 0 8px var(--emerald)"></span>' : ''}
+          <span style="font-weight:${isActive ? '700' : '400'}">${c.campaign_name}</span>
+          ${activeBadge}
+        </span>
+      </td>
+      <td style="padding:12px 12px;color:var(--text-muted)">₹${formatNumber(c.spend)}</td>
+      <td style="padding:12px 12px;font-weight:700;color:${c.roas >= 3 ? 'var(--emerald-light)' : c.roas >= 1.5 ? 'var(--amber)' : 'var(--red)'}">${c.roas}×</td>
+      <td style="padding:12px 12px;color:var(--text-muted)">${c.cpp ? '₹'+c.cpp : '—'}</td>
+      <td style="padding:12px 12px;color:${c.ctr < 0.8 ? 'var(--red)' : 'var(--text-muted)'}">${c.ctr}%</td>
+      <td style="padding:12px 12px;color:${c.frequency > 3.5 ? 'var(--red)' : 'var(--text-muted)'}">${c.frequency}</td>
+      <td style="padding:12px 12px;color:var(--text-muted)">${c.purchases}</td>
+      <td style="padding:12px 12px"><span class="topbar-badge" style="background:${col}22;color:${col};border:1px solid ${col}44;padding:2px 8px;border-radius:4px;font-size:0.65rem;font-weight:700">${c.health_status}</span>${flags}</td>
     </tr>`;
   }).join('');
 
@@ -188,7 +275,7 @@ async function triggerAudit() {
   const btn = document.getElementById('btn-audit');
   if (btn) { btn.textContent = 'Running…'; btn.disabled = true; }
   try {
-    const res = await fetch(`${API_BASE}/api/actions/audit`, { method: 'POST' });
+    const res = await apiFetch(`${API_BASE}/api/actions/audit`, { method: 'POST' });
     const data = await res.json();
     alert(`Audit complete.\nMeta actions: ${data.meta?.actions?.length || 0}\nGoogle actions: ${data.google?.actions?.length || 0}\nDry run: ${data.dry_run}`);
     fetchDashboardData();
@@ -584,4 +671,85 @@ function loadChecklistState() {
       if (el) el.classList.add('done');
     });
   } catch (e) {}
+}
+
+// ── LAUNCH PRO LOGIC ──────────────────────────────────────────
+
+let launchPlatform = 'meta';
+let uploadedFile = null;
+
+function setLaunchPlatform(platform, el) {
+  launchPlatform = platform;
+  document.querySelectorAll('#section-launch .platform-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  
+  // Update button text or descriptions based on platform
+  const btn = document.getElementById('btn-launch');
+  btn.innerHTML = `<i data-lucide="rocket" style="width:16px;height:16px"></i> Launch Perfect ${platform === 'meta' ? 'Meta' : 'Google'} Campaign`;
+  lucide.createIcons();
+}
+
+function handleFileUpload(input) {
+  if (input.files && input.files[0]) {
+    uploadedFile = input.files[0];
+    const zone = document.getElementById('upload-zone');
+    zone.innerHTML = `
+      <i data-lucide="check-circle" style="width:32px;height:32px;color:var(--emerald)"></i>
+      <p style="margin-top:8px;font-size:0.75rem;color:var(--emerald)">${uploadedFile.name} ready</p>
+    `;
+    lucide.createIcons();
+  }
+}
+
+async function generateMagicCopy() {
+  const btn = document.querySelector('[onclick="generateMagicCopy()"]');
+  const original = btn.innerHTML;
+  btn.innerHTML = '<i class="spin" data-lucide="loader-2" style="width:14px;height:14px"></i> Thinking...';
+  lucide.createIcons();
+
+  // Simulated AI Logic for Thabisa Shop
+  setTimeout(() => {
+    const name = document.getElementById('launch-name').value || 'Thabisa Collection';
+    const copies = [
+      `Elevate your living space with the new ${name}. Luxury home decor designed for the modern home. Shop the collection today! ✨`,
+      `Transform your home with Thabisa. Our ${name} brings elegance and warmth to every room. Limited stock available! 🌟`,
+      `Experience premium quality with Thabisa Shop. The ${name} is now live. Get free shipping on your first order! 🛍️`
+    ];
+    document.getElementById('launch-text').value = copies[Math.floor(Math.random() * copies.length)];
+    document.getElementById('launch-headline').value = `Shop ${name} | Thabisa Shop`;
+    btn.innerHTML = original;
+    lucide.createIcons();
+  }, 1200);
+}
+
+async function launchCampaign() {
+  const name = document.getElementById('launch-name').value;
+  const budget = document.getElementById('launch-budget').value;
+  const text = document.getElementById('launch-text').value;
+  const headline = document.getElementById('launch-headline').value;
+  const status = document.getElementById('launch-status');
+
+  if (!name || !budget || !text || !headline) {
+    status.innerHTML = '<span style="color:var(--red)">Please fill in all fields</span>';
+    return;
+  }
+
+  status.innerHTML = '<span class="spin" style="display:inline-block">⚙️</span> Initializing "Gold Standard" deployment...';
+  
+  try {
+    const res = await apiFetch(`/api/actions/launch-${launchPlatform}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, budget, text, headline, platform: launchPlatform })
+    });
+    
+    const data = await res.json();
+    if (data.ok) {
+      status.innerHTML = `<span style="color:var(--emerald)">🚀 SUCCESS! ${launchPlatform === 'meta' ? 'Meta ASC' : 'Google PMax'} campaign is live and on autopilot.</span>`;
+    } else {
+      status.innerHTML = `<span style="color:var(--red)">Error: ${data.error}</span>`;
+    }
+  } catch (e) {
+    status.innerHTML = `<span style="color:var(--red)">Launch failed: ${e.message}</span>`;
+  }
 }
