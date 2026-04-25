@@ -5,8 +5,34 @@ const { createLogger, format, transports } = require('winston');
 const path = require('path');
 const fs = require('fs');
 
+const isVercel = !!process.env.VERCEL;
 const logsDir = path.join(__dirname, '..', 'logs');
-if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+
+// Only create log directory on local (Vercel has read-only filesystem)
+if (!isVercel) {
+  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+}
+
+const logTransports = [
+  new transports.Console({
+    format: format.combine(
+      format.colorize(),
+      format.printf(({ timestamp, level, message, ...meta }) => {
+        const metaStr = Object.keys(meta).length ? ' ' + JSON.stringify(meta) : '';
+        return `[${timestamp}] ${level}: ${message}${metaStr}`;
+      })
+    )
+  })
+];
+
+// Add file transports only when running locally
+if (!isVercel) {
+  logTransports.push(
+    new transports.File({ filename: path.join(logsDir, 'error.log'), level: 'error' }),
+    new transports.File({ filename: path.join(logsDir, 'combined.log') }),
+    new transports.File({ filename: path.join(logsDir, 'actions.log'), level: 'info' })
+  );
+}
 
 const logger = createLogger({
   level: 'info',
@@ -15,20 +41,7 @@ const logger = createLogger({
     format.errors({ stack: true }),
     format.json()
   ),
-  transports: [
-    new transports.Console({
-      format: format.combine(
-        format.colorize(),
-        format.printf(({ timestamp, level, message, ...meta }) => {
-          const metaStr = Object.keys(meta).length ? ' ' + JSON.stringify(meta) : '';
-          return `[${timestamp}] ${level}: ${message}${metaStr}`;
-        })
-      )
-    }),
-    new transports.File({ filename: path.join(logsDir, 'error.log'), level: 'error' }),
-    new transports.File({ filename: path.join(logsDir, 'combined.log') }),
-    new transports.File({ filename: path.join(logsDir, 'actions.log'), level: 'info' }),
-  ]
+  transports: logTransports
 });
 
 // Action logger — structured log for every autopilot decision
