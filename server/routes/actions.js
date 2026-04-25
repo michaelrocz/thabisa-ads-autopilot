@@ -6,8 +6,9 @@ const scheduler = require('../services/scheduler');
 const fs = require('fs');
 const path = require('path');
 
-// GET /api/actions/audit — run full audit now (on demand)
-router.post('/audit', async (req, res) => {
+// POST /api/actions/audit — run full audit now (on demand)
+// GET also supported for Vercel Cron
+router.all('/audit', async (req, res) => {
   try {
     const result = await rulesEngine.runFullAudit();
     scheduler.setLastAuditResult(result);
@@ -15,14 +16,14 @@ router.post('/audit', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET /api/actions/audit/meta — run Meta audit only
-router.post('/audit/meta', async (req, res) => {
+// GET /api/actions/audit/meta — run Meta audit only (GET for Vercel Cron)
+router.all('/audit/meta', async (req, res) => {
   try { res.json(await rulesEngine.runMetaRules()); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // GET /api/actions/audit/google — run Google audit only
-router.post('/audit/google', async (req, res) => {
+router.all('/audit/google', async (req, res) => {
   try { res.json(await rulesEngine.runGoogleRules()); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
