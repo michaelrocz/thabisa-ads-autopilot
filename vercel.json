@@ -1,29 +1,23 @@
 {
   "version": 2,
   "builds": [
-    {
-      "src": "api/index.js",
-      "use": "@vercel/node"
-    }
+    { "src": "api/index.js", "use": "@vercel/node" },
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "styles.css", "use": "@vercel/static" },
+    { "src": "app.js", "use": "@vercel/static" },
+    { "src": "data.js", "use": "@vercel/static" }
   ],
   "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/api/index.js"
-    }
+    { "src": "/api/(.*)", "dest": "/api/index.js" },
+    { "src": "/auth/(.*)", "dest": "/api/index.js" },
+    { "src": "/styles.css", "dest": "/styles.css" },
+    { "src": "/app.js", "dest": "/app.js" },
+    { "src": "/data.js", "dest": "/data.js" },
+    { "src": "/", "dest": "/index.html" }
   ],
   "crons": [
-    {
-      "path": "/api/actions/audit",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/actions/audit/meta",
-      "schedule": "0 3 * * 1,4"
-    },
-    {
-      "path": "/api/actions/audit",
-      "schedule": "30 3 * * 1"
-    }
+    { "path": "/api/actions/audit", "schedule": "0 3 * * *" },
+    { "path": "/api/actions/audit/meta", "schedule": "0 3 * * 1,4" },
+    { "path": "/api/actions/audit", "schedule": "30 3 * * 1" }
   ]
 }
