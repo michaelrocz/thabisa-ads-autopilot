@@ -18,6 +18,13 @@ async function apiFetch(url, options = {}) {
   return fetch(url, options);
 }
 
+// Window helper to force update token from console if needed
+window.updateMetaToken = (token) => {
+  localStorage.setItem('meta_access_token', token);
+  console.log("Meta token updated! Refreshing data...");
+  initDashboard();
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   lucide.createIcons();
   buildSegments();
