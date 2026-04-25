@@ -110,10 +110,8 @@ class LauncherService {
         } else if (item.type === 'video') {
           creativeData.object_story_spec.video_data = {
             video_id: assetId,
-            image_url: 'https://thabisa.shop/placeholder-poster.jpg',
-            call_to_action: { type: 'SHOP_NOW' },
-            title: headline,
-            message: text
+            image_url: item.thumbnail_url || 'https://thabisa.shop/favicon.ico',
+            call_to_action: { type: 'SHOP_NOW' }
           };
           delete creativeData.object_story_spec.link_data;
         }

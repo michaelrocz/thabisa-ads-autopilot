@@ -756,6 +756,7 @@ function selectFromLibrary(item) {
     id: item.id,
     type: item.type,
     url: item.url,
+    thumbnail_url: item.url,
     name: item.name,
     isLibrary: true
   });
@@ -875,7 +876,7 @@ async function launchCampaign() {
     const assetResults = [];
     for (const item of launchFiles) {
       if (item.isLibrary) {
-        assetResults.push({ type: item.type, id: item.id });
+        assetResults.push({ type: item.type, id: item.id, thumbnail_url: item.thumbnail_url });
       } else {
         const result = await uploadFileToMeta(item.file);
         assetResults.push(result);
