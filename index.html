@@ -92,8 +92,8 @@
         </div>
         <div class="stat-card blue">
           <div class="stat-label">Active Campaigns</div>
-          <div class="stat-value blue" id="stat-campaigns">14</div>
-          <div class="stat-sub">8 Google · 6 Meta</div>
+          <div class="stat-value blue" id="stat-campaigns">0</div>
+          <div class="stat-sub" id="stat-campaigns-sub">Initializing...</div>
         </div>
         <div class="stat-card red">
           <div class="stat-label">Alerts</div>
@@ -118,21 +118,19 @@
               </defs>
               <path d="M20,100 A90,90 0 0,1 180,100" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="14" stroke-linecap="round"/>
               <path d="M20,100 A90,90 0 0,1 180,100" fill="none" stroke="url(#gaugeGrad)" stroke-width="14" stroke-linecap="round" stroke-dasharray="282.7" stroke-dashoffset="56" id="gaugeArc"/>
-              <text x="100" y="88" text-anchor="middle" font-family="Playfair Display" font-size="28" font-weight="700" fill="#D4A84B">3.4×</text>
+              <text x="100" y="88" text-anchor="middle" font-family="Playfair Display" font-size="28" font-weight="700" fill="#D4A84B" id="gauge-val">0.0×</text>
               <text x="100" y="104" text-anchor="middle" font-family="Inter" font-size="9" fill="#8A8799" letter-spacing="2">CURRENT ROAS</text>
               <text x="20" y="116" text-anchor="middle" font-family="Inter" font-size="8" fill="#5A5870">0×</text>
               <text x="100" y="116" text-anchor="middle" font-family="Inter" font-size="8" fill="#D4A84B">3× TARGET</text>
-              <text x="180" y="116" text-anchor="middle" font-family="Inter" font-size="8" fill="#5A5870">5×</text>
+              <text x="180" y="116" text-anchor="middle" font-family="Inter" font-size="8" fill="#5A5870">10×</text>
             </svg>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
-            <div class="score-band healthy" style="padding:8px 12px">
-              <span class="score-indicator"></span>
-              <span style="font-size:0.72rem;color:var(--emerald-light);font-weight:600">Google: 3.6×</span>
+            <div class="score-band" style="padding:8px 12px;background:rgba(255,255,255,0.03)">
+              <span style="font-size:0.72rem;color:var(--text-muted);font-weight:600" id="roas-google">Google: —</span>
             </div>
-            <div class="score-band healthy" style="padding:8px 12px">
-              <span class="score-indicator"></span>
-              <span style="font-size:0.72rem;color:var(--emerald-light);font-weight:600">Meta: 3.1×</span>
+            <div class="score-band" style="padding:8px 12px;background:rgba(255,255,255,0.03)">
+              <span style="font-size:0.72rem;color:var(--text-muted);font-weight:600" id="roas-meta">Meta: —</span>
             </div>
           </div>
         </div>

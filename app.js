@@ -167,18 +167,27 @@ async function updateToken() {
 
 function updateDashboard(meta) {
   // ── Stat cards
-  setStatValue('stat-roas', meta.blended_roas + '×');
+  setStatValue('stat-roas', meta.blended_roas.toFixed(1) + '×');
   setStatValue('stat-revenue', '₹' + formatNumber(meta.total_revenue));
   setStatValue('stat-campaigns', meta.active_campaigns);
+  
+  // Update sub-stats
+  const roasSub = document.querySelector('#stat-roas + .stat-sub');
+  if (roasSub) {
+    roasSub.textContent = meta.blended_roas >= 3 ? '↑ Above 3× target' : '↓ Below target';
+    roasSub.style.color = meta.blended_roas >= 3 ? 'var(--emerald-light)' : 'var(--red)';
+  }
+
+  setStatValue('stat-campaigns-sub', `0 Google · ${meta.active_campaigns} Meta`);
+  setStatValue('roas-meta', `Meta: ${meta.blended_roas.toFixed(1)}×`);
+  setStatValue('gauge-val', meta.blended_roas.toFixed(1) + '×');
 
   // ── ROAS gauge arc
   const arc = document.getElementById('gaugeArc');
-  const gaugeNum = document.querySelector('.gauge-svg text[font-size="28"]');
-  if (arc && meta.blended_roas) {
+  if (arc) {
     const pct = Math.min(meta.blended_roas / 5, 1);
     const dashOffset = 282.7 - (282.7 * pct);
     arc.setAttribute('stroke-dashoffset', dashOffset.toFixed(1));
-    if (gaugeNum) gaugeNum.textContent = meta.blended_roas + '×';
   }
 
   // ── Signal bars
