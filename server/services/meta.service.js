@@ -149,7 +149,10 @@ function getPurchaseCount(actions = []) {
 
 // ── SUMMARY (FOR DASHBOARD) ─────────────────────────────────
 async function getSummary() {
-  const insights = await getInsights('this_month', 'campaign');
+  let insights = await getInsights('this_month', 'campaign');
+  if (insights.length === 0) {
+    insights = await getInsights('last_30d', 'campaign');
+  }
   const campaigns = await getCampaigns();
   
   // Only count campaigns that are actually ACTIVE in Meta
