@@ -3,6 +3,8 @@ const FormData = require('form-data');
 const logger = require('../utils/logger');
 const meta = require('./meta.service');
 
+const APP_ID = '4198582757119959';
+
 /**
  * LAUNCHER SERVICE
  * Handles one-click creation of 'Perfect' campaigns on Meta and Google.
