@@ -132,39 +132,24 @@ async function updateToken() {
   const status = document.getElementById('token-status');
   const token = input.value.trim();
 
-  if (!token) {
-    status.textContent = 'Please paste a token first';
-    status.style.color = 'var(--red)';
-    return;
-  }
-
-  btn.textContent = 'Updating...';
+  if (!token) return;
   btn.disabled = true;
+  btn.textContent = 'Updating...';
 
   try {
-    const res = await apiFetch(`${API_BASE}/api/actions/update-token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token })
-    });
-    const data = await res.json();
-    if (data.ok) {
-      status.textContent = '✅ Success! Refreshing...';
-      status.style.color = 'var(--emerald-light)';
-      localStorage.setItem('meta_access_token', token);
-      setTimeout(() => {
-        closeTokenModal();
-        location.reload(); 
-      }, 800);
-    } else {
-      throw new Error(data.error || 'Failed to update');
-    }
+    localStorage.setItem('meta_access_token', token);
+    status.textContent = '✅ Success! Refreshing...';
+    status.style.color = 'var(--emerald)';
+    
+    setTimeout(() => {
+      closeTokenModal();
+      location.reload(); 
+    }, 800);
   } catch (e) {
-    status.textContent = '❌ Error: ' + e.message;
+    status.textContent = '❌ ' + e.message;
     status.style.color = 'var(--red)';
-  } finally {
-    btn.textContent = 'Update Token & Resume';
     btn.disabled = false;
+    btn.textContent = 'Update Token & Resume';
   }
 }
 
