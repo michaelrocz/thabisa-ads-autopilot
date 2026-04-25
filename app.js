@@ -693,7 +693,12 @@ function setLaunchPlatform(platform, el) {
 
 function handleFileUpload(input) {
   if (input.files) {
-    const newFiles = Array.from(input.files);
+    const newFiles = Array.from(input.files).map(file => ({
+      file: file,
+      type: file.type.startsWith('video/') ? 'video' : 'image',
+      url: URL.createObjectURL(file),
+      name: file.name
+    }));
     launchFiles = [...launchFiles, ...newFiles];
     renderPreviews();
     
@@ -702,23 +707,78 @@ function handleFileUpload(input) {
     if (launchFiles.length > 0) {
       zone.innerHTML = `
         <i data-lucide="check-circle" style="width:32px;height:32px;color:var(--emerald)"></i>
-        <p style="margin-top:8px;font-size:0.75rem;color:var(--emerald)">${launchFiles.length} file(s) selected</p>
+        <p style="margin-top:8px;font-size:0.75rem;color:var(--emerald)">${launchFiles.length} item(s) selected</p>
       `;
     }
     lucide.createIcons();
   }
 }
 
+function openLibraryModal() {
+  document.getElementById('library-modal').classList.add('active');
+  fetchLibrary();
+}
+
+function closeLibraryModal() {
+  document.getElementById('library-modal').classList.remove('active');
+}
+
+async function fetchLibrary() {
+  const loading = document.getElementById('library-loading');
+  const content = document.getElementById('library-content');
+  loading.style.display = 'block';
+  content.innerHTML = '';
+  
+  try {
+    const res = await apiFetch(`${API_BASE}/api/meta/library`);
+    const data = await res.json();
+    loading.style.display = 'none';
+    
+    const all = [
+      ...data.images.map(img => ({ type: 'image', id: img.hash, url: img.url, name: img.name })),
+      ...data.videos.map(vid => ({ type: 'video', id: vid.id, url: vid.thumbnail_url, name: vid.title }))
+    ];
+    
+    content.innerHTML = all.map(item => `
+      <div class="preview-item" style="cursor:pointer" onclick='selectFromLibrary(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
+        <img src="${item.url}" alt="${item.name}">
+        <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);font-size:8px;padding:2px;overflow:hidden;white-space:nowrap">${item.name || item.id}</div>
+        ${item.type === 'video' ? '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white">▶</div>' : ''}
+      </div>
+    `).join('');
+  } catch (e) {
+    loading.innerHTML = `<span style="color:var(--red)">Failed to load library: ${e.message}</span>`;
+  }
+}
+
+function selectFromLibrary(item) {
+  launchFiles.push({
+    id: item.id,
+    type: item.type,
+    url: item.url,
+    name: item.name,
+    isLibrary: true
+  });
+  closeLibraryModal();
+  renderPreviews();
+  
+  const zone = document.getElementById('upload-zone');
+  zone.innerHTML = `
+    <i data-lucide="check-circle" style="width:32px;height:32px;color:var(--emerald)"></i>
+    <p style="margin-top:8px;font-size:0.75rem;color:var(--emerald)">${launchFiles.length} item(s) selected</p>
+  `;
+  lucide.createIcons();
+}
+
 function renderPreviews() {
   const grid = document.getElementById('creative-preview-grid');
   if (!grid) return;
   
-  grid.innerHTML = launchFiles.map((file, idx) => {
-    const isVideo = file.type.startsWith('video/');
-    const url = URL.createObjectURL(file);
+  grid.innerHTML = launchFiles.map((item, idx) => {
+    const isVideo = item.type === 'video';
     return `
       <div class="preview-item">
-        ${isVideo ? `<video src="${url}" muted autoplay loop></video>` : `<img src="${url}">`}
+        ${(isVideo && !item.isLibrary) ? `<video src="${item.url}" muted autoplay loop></video>` : `<img src="${item.url}">`}
         <div class="preview-remove" onclick="removeFile(${idx})">✕</div>
       </div>
     `;
@@ -726,6 +786,8 @@ function renderPreviews() {
 }
 
 function removeFile(idx) {
+  const item = launchFiles[idx];
+  if (item.url && !item.isLibrary) URL.revokeObjectURL(item.url);
   launchFiles.splice(idx, 1);
   renderPreviews();
   
@@ -736,7 +798,7 @@ function removeFile(idx) {
       <p style="margin-top:8px;font-size:0.75rem;color:var(--text-muted)">Click or drag files to upload (Images & Videos)</p>
     `;
   } else {
-    zone.querySelector('p').textContent = `${launchFiles.length} file(s) selected`;
+    zone.querySelector('p').textContent = `${launchFiles.length} item(s) selected`;
   }
   lucide.createIcons();
 }
@@ -808,11 +870,15 @@ async function launchCampaign() {
   status.innerHTML = '<span class="spin" style="display:inline-block">⚙️</span> Step 1/2: Uploading large assets directly to Meta...';
   
   try {
-    // Step 1: Direct Upload from Browser to Meta (Bypasses Vercel Limits)
+    // Step 1: Direct Upload from Browser to Meta for LOCAL files only
     const assetResults = [];
-    for (const file of launchFiles) {
-      const result = await uploadFileToMeta(file);
-      assetResults.push(result);
+    for (const item of launchFiles) {
+      if (item.isLibrary) {
+        assetResults.push({ type: item.type, id: item.id });
+      } else {
+        const result = await uploadFileToMeta(item.file);
+        assetResults.push(result);
+      }
     }
 
     status.innerHTML = '<span class="spin" style="display:inline-block">⚙️</span> Step 2/2: Deploying "Gold Standard" campaign structure...';

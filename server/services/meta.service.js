@@ -262,9 +262,22 @@ async function getPixelHealth() {
   }
 }
 
+async function getLibraryAssets() {
+  const [images, videos] = await Promise.all([
+    api(`/${ACCOUNT_ID}/adimages`, { fields: 'hash,name,url', limit: 50 }),
+    api(`/${ACCOUNT_ID}/advideos`, { fields: 'id,title,thumbnail_url', limit: 50 })
+  ]);
+  
+  return {
+    images: images.data || [],
+    videos: videos.data || []
+  };
+}
+
 module.exports = {
   testConnection, getCampaigns, getAdSets, getInsights,
   getSummary, pauseAdSet, scaleBudget, decreaseBudget, 
   updateAdSetTargeting, updateStatus, pauseAd, getPixelHealth,
+  getLibraryAssets,
   metaTokenStorage
 };

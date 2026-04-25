@@ -52,4 +52,10 @@ router.post('/scale-budget', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/meta/library
+router.get('/library', async (req, res) => {
+  try { res.json(await meta.getLibraryAssets()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;
