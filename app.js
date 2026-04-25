@@ -92,22 +92,34 @@ function updateSetupStatus(data) {
 
 async function fetchDashboardData() {
   try {
-    const [metaRes, alertsRes] = await Promise.allSettled([
-      apiFetch(`${API_BASE}/api/meta/summary`).then(r => r.json()),
-      apiFetch(`${API_BASE}/api/actions/alerts`).then(r => r.json())
-    ]);
-    if (metaRes.status === 'fulfilled') {
-      if (metaRes.value.error) {
-        showTokenModal(metaRes.value.error);
-      } else {
-        updateDashboard(metaRes.value);
-      }
+    const res = await apiFetch(`${API_BASE}/api/meta/summary`);
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Connection error');
     }
-    if (alertsRes.status === 'fulfilled') {
-      updateAlertBadge(alertsRes.value);
+    const meta = await res.json();
+    
+    if (meta && !meta.error) {
+      liveMode = true;
+      updateDashboard(meta);
+      document.querySelector('.live-indicator').innerHTML = '<span class="pulse"></span> LIVE';
+      document.querySelector('.live-indicator').style.color = 'var(--emerald)';
+    } else {
+      throw new Error(meta.error || 'No data');
     }
+
+    // Also fetch alerts
+    const alertsRes = await apiFetch(`${API_BASE}/api/actions/alerts`);
+    const alerts = await alertsRes.json();
+    updateAlertBadge(alerts);
   } catch (e) {
     console.warn('Live data fetch failed:', e.message);
+    document.querySelector('.live-indicator').innerHTML = '<span class="pulse" style="background:var(--red)"></span> OFFLINE';
+    document.querySelector('.live-indicator').style.color = 'var(--red)';
+    // If it's a token error, show the modal
+    if (e.message.includes('token') || e.message.includes('valid')) {
+      showTokenModal(e.message);
+    }
   }
 }
 
