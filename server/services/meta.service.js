@@ -10,6 +10,7 @@ const metaTokenStorage = new AsyncLocalStorage();
 const BASE_URL = `https://graph.facebook.com/${process.env.META_API_VERSION || 'v21.0'}`;
 const ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID || 'act_2285838831476206'; 
 const PIXEL_ID = '1541255577299707';
+const APP_ID = '4198582757119959';
 const DRY_RUN = process.env.DRY_RUN !== 'false';
 
 // ── HELPERS ─────────────────────────────────────────────────
@@ -19,7 +20,7 @@ function getToken() {
 
 function api(endpoint, params = {}) {
   return axios.get(`${BASE_URL}${endpoint}`, {
-    params: { access_token: getToken(), ...params }
+    params: { access_token: getToken(), app_id: APP_ID, ...params }
   }).then(r => r.data).catch(err => {
     const msg = err.response?.data?.error?.message || err.message;
     logger.error(`Meta API error: ${msg}`, { endpoint });
@@ -33,7 +34,7 @@ function apiPost(endpoint, data = {}) {
     return Promise.resolve({ id: 'dry_run', dry_run: true });
   }
   return axios.post(`${BASE_URL}${endpoint}`, null, {
-    params: { access_token: getToken(), ...data }
+    params: { access_token: getToken(), app_id: APP_ID, ...data }
   }).then(r => r.data).catch(err => {
     const msg = err.response?.data?.error?.message || err.message;
     logger.error(`Meta API POST error: ${msg}`, { endpoint });
