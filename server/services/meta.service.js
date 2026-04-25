@@ -8,7 +8,8 @@ const logger = require('../utils/logger');
 const metaTokenStorage = new AsyncLocalStorage();
 
 const BASE_URL = `https://graph.facebook.com/${process.env.META_API_VERSION || 'v21.0'}`;
-const ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID; // act_XXXXXXXX
+const ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID || 'act_2285838831476206'; 
+const PIXEL_ID = '1541255577299707';
 const DRY_RUN = process.env.DRY_RUN !== 'false';
 
 // ── HELPERS ─────────────────────────────────────────────────
