@@ -1,0 +1,65 @@
+THABISA ADS AUTOPILOT — DESIGN DOCUMENTATION
+Google Ads API Basic Access Application
+================================================
+
+1. OVERVIEW
+-----------
+Tool Name: Thabisa Ads Autopilot
+Tool Type: Internal campaign optimization system
+Owner: Thabisa Shop (doproerseo@gmail.com)
+Live URL: https://thabisa-ads-autopilot.vercel.app
+
+2. PURPOSE
+----------
+Thabisa Ads Autopilot is an internal tool built exclusively to manage 
+Thabisa Shop's own Google Ads campaigns. It does NOT serve any external 
+clients or third parties.
+
+The tool uses the Google Ads API to:
+- Read campaign performance metrics (impressions, clicks, spend, conversions, ROAS)
+- Monitor budget utilization across active campaigns
+- Automatically pause campaigns that exceed CPP (Cost Per Purchase) thresholds
+- Scale budgets on campaigns consistently achieving 3x+ ROAS
+- Generate daily audit reports for the business owner
+
+3. GOOGLE ADS API USAGE
+------------------------
+API Operations Used:
+  - customer.query (GAQL) — read campaign metrics and health status
+  - CampaignBudgetService — update daily budgets (scale/pause logic)
+  - CampaignService — pause underperforming campaigns
+
+Data Read:
+  - campaign.id, campaign.name, campaign.status
+  - campaign_budget.amount_micros
+  - metrics.cost_micros, metrics.conversions, metrics.conversions_value
+  - metrics.impressions, metrics.clicks, metrics.ctr
+
+Write Operations (DRY_RUN=true by default):
+  - Budget adjustments: +20% for campaigns with ROAS > 3.0 for 3 consecutive days
+  - Pause: campaigns with CPP > INR 2500 after INR 1000 minimum spend
+
+4. SYSTEM ARCHITECTURE
+-----------------------
+Backend: Node.js / Express — deployed on Vercel (serverless)
+Scheduler: Vercel Cron Jobs — daily audit at 3:00 AM UTC
+Authentication: OAuth 2.0 (refresh token flow)
+Dashboard: Static HTML/JS — reads live API data
+
+5. ACCESS SCOPE
+----------------
+- Only accesses: Customer ID 443-287-3398 (Thabisa Shop account)
+- No external user access
+- No client data access
+- No data resale or sharing
+
+6. SAFETY CONTROLS
+-------------------
+- DRY_RUN mode: All actions logged before execution
+- Minimum spend gate: No pausing before INR 1000 spend
+- ROAS gate: 3 consecutive days required before scaling
+- Manual override: Dashboard "Run Audit Now" button
+
+Developer: Michael Rocz
+Contact: doproerseo@gmail.com
+Application Date: April 2026

@@ -4,9 +4,15 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const logger = require('./utils/logger');
 
 const app = express();
+
+// ── STATIC FILES ─────────────────────────────────────────────
+// Serve dashboard (index.html, styles.css, app.js, data.js) from project root
+const projectRoot = path.join(__dirname, '..');
+app.use(express.static(projectRoot, { index: 'index.html' }));
 
 // ── MIDDLEWARE ───────────────────────────────────────────────
 app.use(cors({ origin: '*' }));
@@ -27,27 +33,9 @@ app.use('/api/actions', require('./routes/actions'));
 
 app.get('/auth/google', (req, res) => res.redirect('/api/google/oauth-start'));
 
-// ── ROOT ─────────────────────────────────────────────────────
+// ── ROOT — serve dashboard ───────────────────────────────────
 app.get('/', (req, res) => {
-  res.json({
-    service: 'Thabisa Ads Autopilot Server',
-    version: '1.0.0',
-    status: 'running',
-    dry_run: process.env.DRY_RUN !== 'false',
-    runtime: process.env.VERCEL ? 'vercel-serverless' : 'node-local',
-    endpoints: {
-      meta_test:       'GET  /api/meta/test',
-      meta_summary:    'GET  /api/meta/summary',
-      google_test:     'GET  /api/google/test',
-      google_summary:  'GET  /api/google/summary',
-      google_oauth:    'GET  /auth/google',
-      run_audit:       'POST /api/actions/audit',
-      last_audit:      'GET  /api/actions/last-audit',
-      alerts:          'GET  /api/actions/alerts',
-      logs:            'GET  /api/actions/logs',
-      status:          'GET  /api/actions/status'
-    }
-  });
+  res.sendFile(path.join(__dirname, '../index.html'));
 });
 
 // ── ERROR HANDLER ────────────────────────────────────────────
