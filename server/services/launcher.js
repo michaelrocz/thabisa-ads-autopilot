@@ -50,8 +50,9 @@ class LauncherService {
     try {
       // 1. Create Campaign (Advantage+ Shopping)
       // Note: ASC campaigns have specific objective and special_ad_categories constraints
+      // 1. Create Campaign (Sales Objective)
       const campaignRes = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/campaigns`, {
-        name: `AUTOPILOT_LAUNCH_${name}_${Date.now()}`,
+        name: `THABISA_SALES_AUTOPILOT_${name}`,
         objective: 'OUTCOME_SALES',
         status: 'PAUSED',
         special_ad_categories: []
@@ -59,45 +60,39 @@ class LauncherService {
 
       const campaignId = campaignRes.data.id;
 
-      // 2. Create Ad Set (Safe Mode: Optimized for Link Clicks to avoid Pixel errors)
+      // 2. Create Ad Set (Optimized for Purchase Conversions)
       const adSetRes = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/adsets`, {
-        name: `AdSet_${name}`,
+        name: `Broad_UAE_IN_${name}`,
         campaign_id: campaignId,
         daily_budget: parseInt(budget) * 100, 
         billing_event: 'IMPRESSIONS',
-        optimization_goal: 'LINK_CLICKS',
+        optimization_goal: 'OFFSITE_CONVERSIONS',
+        promoted_object: { pixel_id: '1541255577299707', custom_event_type: 'PURCHASE' },
         targeting: { 
           geo_locations: { countries: ['AE', 'IN'] },
-          publisher_platforms: ['facebook', 'instagram']
+          publisher_platforms: ['facebook', 'instagram'],
+          age_min: 18
         },
         status: 'ACTIVE'
       }, { params: { access_token: token } });
 
       const adSetId = adSetRes.data.id;
 
-      // 3. Create Ads for each creative (either from pre-uploaded assets or files)
+      // 3. Create Multiple Ads (One for each creative selected)
       const adResults = [];
-      const creativesToProcess = assets.length > 0 
-        ? assets.map(a => ({ type: a.type, id: a.id }))
-        : files.map(f => ({ type: f.mimetype.startsWith('video/') ? 'video' : 'image', file: f }));
+      const creativesToProcess = assets.length > 0 ? assets : [];
 
       for (let i = 0; i < creativesToProcess.length; i++) {
         const item = creativesToProcess[i];
-        let assetId = item.id;
-
-        // If no ID, upload it now (fallback for smaller files)
-        if (!assetId && item.file) {
-          if (item.type === 'image') assetId = await this.uploadImageToMeta(token, accountId, item.file);
-          else assetId = await this.uploadVideoToMeta(token, accountId, item.file);
-        }
-
-        let creativeData = {
+        
+        // Create Creative first
+        const creativeData = {
           name: `Creative_${name}_${i}`,
           object_story_spec: {
-            page_id: process.env.META_PAGE_ID,
+            page_id: '372752173550405',
             link_data: {
               call_to_action: { type: 'SHOP_NOW' },
-              link: process.env.SHOP_URL || 'https://thabisa.shop',
+              link: 'https://thabisa.shop',
               message: text,
               name: headline
             }
@@ -105,11 +100,11 @@ class LauncherService {
         };
 
         if (item.type === 'image') {
-          creativeData.object_story_spec.link_data.image_hash = assetId;
-        } else if (item.type === 'video') {
+          creativeData.object_story_spec.link_data.image_hash = item.id;
+        } else {
           creativeData.object_story_spec.video_data = {
-            video_id: assetId,
-            image_url: item.thumbnail_url || 'https://thabisa.shop/favicon.ico',
+            video_id: item.id,
+            image_url: item.thumbnail_url || item.url,
             call_to_action: { type: 'SHOP_NOW' }
           };
           delete creativeData.object_story_spec.link_data;
@@ -119,17 +114,19 @@ class LauncherService {
           params: { access_token: token }
         });
 
+        // Link Creative to Ad Set
         const adRes = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/ads`, {
-          name: `Ad_${name}_${i}`,
+          name: `Ad_${name}_v${i+1}`,
           adset_id: adSetId,
           creative: { creative_id: creativeRes.data.id },
+          tracking_specs: [ { action_type: ['offsite_conversion'], fb_pixel: ['1541255577299707'] } ],
           status: 'PAUSED'
         }, { params: { access_token: token } });
 
         adResults.push(adRes.data.id);
       }
 
-      logger.info(`Launcher: Campaign ${campaignId} created with ${adResults.length} ads.`);
+      logger.info(`Launcher: Gold Standard Campaign created with ${adResults.length} ads.`);
       return { ok: true, campaignId, adSetId, adIds: adResults };
     } catch (e) {
       const errorMsg = e.response?.data?.error?.message || e.message;
