@@ -9,6 +9,12 @@ const launcher = require('../services/launcher');
 const logger = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
+const multer = require('multer');
+
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for videos
+});
 
 // POST /api/actions/audit — run full audit now (on demand)
 // GET also supported for Vercel Cron
@@ -106,9 +112,13 @@ router.post('/update-token', (req, res) => {
 });
 
 // POST /api/actions/launch-meta — One-click launch
-router.post('/launch-meta', async (req, res) => {
+router.post('/launch-meta', upload.array('files'), async (req, res) => {
   try {
-    const result = await launcher.createMetaCampaign(req.body);
+    const config = {
+      ...req.body,
+      files: req.files
+    };
+    const result = await launcher.createMetaCampaign(config);
     res.json(result);
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });

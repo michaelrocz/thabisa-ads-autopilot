@@ -676,7 +676,7 @@ function loadChecklistState() {
 // ── LAUNCH PRO LOGIC ──────────────────────────────────────────
 
 let launchPlatform = 'meta';
-let uploadedFile = null;
+let launchFiles = [];
 
 function setLaunchPlatform(platform, el) {
   launchPlatform = platform;
@@ -690,15 +690,53 @@ function setLaunchPlatform(platform, el) {
 }
 
 function handleFileUpload(input) {
-  if (input.files && input.files[0]) {
-    uploadedFile = input.files[0];
+  if (input.files) {
+    const newFiles = Array.from(input.files);
+    launchFiles = [...launchFiles, ...newFiles];
+    renderPreviews();
+    
+    // Reset the zone UI if files exist
     const zone = document.getElementById('upload-zone');
-    zone.innerHTML = `
-      <i data-lucide="check-circle" style="width:32px;height:32px;color:var(--emerald)"></i>
-      <p style="margin-top:8px;font-size:0.75rem;color:var(--emerald)">${uploadedFile.name} ready</p>
-    `;
+    if (launchFiles.length > 0) {
+      zone.innerHTML = `
+        <i data-lucide="check-circle" style="width:32px;height:32px;color:var(--emerald)"></i>
+        <p style="margin-top:8px;font-size:0.75rem;color:var(--emerald)">${launchFiles.length} file(s) selected</p>
+      `;
+    }
     lucide.createIcons();
   }
+}
+
+function renderPreviews() {
+  const grid = document.getElementById('creative-preview-grid');
+  if (!grid) return;
+  
+  grid.innerHTML = launchFiles.map((file, idx) => {
+    const isVideo = file.type.startsWith('video/');
+    const url = URL.createObjectURL(file);
+    return `
+      <div class="preview-item">
+        ${isVideo ? `<video src="${url}" muted autoplay loop></video>` : `<img src="${url}">`}
+        <div class="preview-remove" onclick="removeFile(${idx})">✕</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function removeFile(idx) {
+  launchFiles.splice(idx, 1);
+  renderPreviews();
+  
+  const zone = document.getElementById('upload-zone');
+  if (launchFiles.length === 0) {
+    zone.innerHTML = `
+      <i data-lucide="upload-cloud" style="width:32px;height:32px;color:var(--text-dim)"></i>
+      <p style="margin-top:8px;font-size:0.75rem;color:var(--text-muted)">Click or drag files to upload (Images & Videos)</p>
+    `;
+  } else {
+    zone.querySelector('p').textContent = `${launchFiles.length} file(s) selected`;
+  }
+  lucide.createIcons();
 }
 
 async function generateMagicCopy() {
@@ -736,11 +774,21 @@ async function launchCampaign() {
 
   status.innerHTML = '<span class="spin" style="display:inline-block">⚙️</span> Initializing "Gold Standard" deployment...';
   
+  const formData = new FormData();
+  formData.append('name', name);
+  formData.append('budget', budget);
+  formData.append('text', text);
+  formData.append('headline', headline);
+  formData.append('platform', launchPlatform);
+  
+  launchFiles.forEach(file => {
+    formData.append('files', file);
+  });
+
   try {
     const res = await apiFetch(`/api/actions/launch-${launchPlatform}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, budget, text, headline, platform: launchPlatform })
+      body: formData
     });
     
     const data = await res.json();

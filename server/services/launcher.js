@@ -1,4 +1,5 @@
 const axios = require('axios');
+const FormData = require('form-data');
 const logger = require('../utils/logger');
 const meta = require('./meta.service');
 
@@ -9,11 +10,38 @@ const meta = require('./meta.service');
 
 class LauncherService {
   
+  async uploadImageToMeta(token, accountId, file) {
+    const form = new FormData();
+    form.append('bytes', file.buffer, { filename: file.originalname });
+    
+    const res = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/adimages`, form, {
+      params: { access_token: token },
+      headers: form.getHeaders()
+    });
+    
+    // Meta returns { images: { "filename": { hash: "..." } } }
+    const hash = Object.values(res.data.images)[0].hash;
+    return hash;
+  }
+
+  async uploadVideoToMeta(token, accountId, file) {
+    const form = new FormData();
+    form.append('source', file.buffer, { filename: file.originalname });
+    form.append('title', file.originalname);
+    
+    const res = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/advideos`, form, {
+      params: { access_token: token },
+      headers: form.getHeaders()
+    });
+    
+    return res.data.id; // Returns video_id
+  }
+
   /**
    * CREATE META CAMPAIGN (Advantage+ Shopping / ASC)
    */
   async createMetaCampaign(config) {
-    const { name, budget, text, headline } = config;
+    const { name, budget, text, headline, files = [] } = config;
     const accountId = process.env.META_AD_ACCOUNT_ID;
     const token = meta.getToken();
 
@@ -46,12 +74,54 @@ class LauncherService {
 
       const adSetId = adSetRes.data.id;
 
-      // 3. Create Ad Creative (Standard implementation placeholder)
-      // In a full implementation, we'd upload the image first.
-      // Here we assume a default template or previously uploaded asset.
-      logger.info(`Launcher: Campaign ${campaignId} and AdSet ${adSetId} created. Ad creation pending asset upload.`);
+      // 3. Create Ads for each file
+      const adResults = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        let creativeData = {
+          name: `Creative_${name}_${i}`,
+          object_story_spec: {
+            page_id: process.env.META_PAGE_ID,
+            link_data: {
+              call_to_action: { type: 'SHOP_NOW' },
+              link: process.env.SHOP_URL || 'https://thabisa.shop',
+              message: text,
+              name: headline
+            }
+          }
+        };
 
-      return { ok: true, campaignId, adSetId };
+        if (file.mimetype.startsWith('image/')) {
+          const hash = await this.uploadImageToMeta(token, accountId, file);
+          creativeData.object_story_spec.link_data.image_hash = hash;
+        } else if (file.mimetype.startsWith('video/')) {
+          const videoId = await this.uploadVideoToMeta(token, accountId, file);
+          creativeData.object_story_spec.video_data = {
+            video_id: videoId,
+            image_url: 'https://thabisa.shop/placeholder-poster.jpg', // Should be a frame from video
+            call_to_action: { type: 'SHOP_NOW' },
+            title: headline,
+            message: text
+          };
+          delete creativeData.object_story_spec.link_data;
+        }
+
+        const creativeRes = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/adcreatives`, creativeData, {
+          params: { access_token: token }
+        });
+
+        const adRes = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/ads`, {
+          name: `Ad_${name}_${i}`,
+          adset_id: adSetId,
+          creative: { creative_id: creativeRes.data.id },
+          status: 'PAUSED'
+        }, { params: { access_token: token } });
+
+        adResults.push(adRes.data.id);
+      }
+
+      logger.info(`Launcher: Campaign ${campaignId} created with ${adResults.length} ads.`);
+      return { ok: true, campaignId, adSetId, adIds: adResults };
     } catch (e) {
       const errorMsg = e.response?.data?.error?.message || e.message;
       logger.error(`Launcher: Meta Creation Failed: ${errorMsg}`);

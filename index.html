@@ -214,9 +214,10 @@
             <label class="stat-label" style="display:block;margin-bottom:8px">Upload Product Photo/Video</label>
             <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
               <i data-lucide="upload-cloud" style="width:32px;height:32px;color:var(--text-dim)"></i>
-              <p style="margin-top:8px;font-size:0.75rem;color:var(--text-muted)">Click or drag file to upload</p>
-              <input type="file" id="file-input" style="display:none" onchange="handleFileUpload(this)">
+              <p style="margin-top:8px;font-size:0.75rem;color:var(--text-muted)">Click or drag files to upload (Images & Videos)</p>
+              <input type="file" id="file-input" style="display:none" multiple accept="image/*,video/*" onchange="handleFileUpload(this)">
             </div>
+            <div id="creative-preview-grid" class="creative-grid mt-16"></div>
           </div>
         </div>
 
