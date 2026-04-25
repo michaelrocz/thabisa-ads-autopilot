@@ -812,13 +812,14 @@ async function generateMagicCopy() {
   // Simulated AI Logic for Thabisa Shop
   setTimeout(() => {
     const name = document.getElementById('launch-name').value || 'Thabisa Collection';
+    const offer = "✨ 10% OFF + FREE SHIPPING ✨";
     const copies = [
-      `Elevate your living space with the new ${name}. Luxury home decor designed for the modern home. Shop the collection today! ✨`,
-      `Transform your home with Thabisa. Our ${name} brings elegance and warmth to every room. Limited stock available! 🌟`,
-      `Experience premium quality with Thabisa Shop. The ${name} is now live. Get free shipping on your first order! 🛍️`
+      `Elevate your living space with the new ${name}. Luxury home decor designed for the modern home. ${offer} Shop the collection today! 🛍️`,
+      `Transform your home with Thabisa. Our ${name} brings elegance and warmth to every room. ${offer} Limited stock available! 🌟`,
+      `Experience premium quality with Thabisa Shop. The ${name} is now live. ${offer} Order now! 🏠`
     ];
     document.getElementById('launch-text').value = copies[Math.floor(Math.random() * copies.length)];
-    document.getElementById('launch-headline').value = `Shop ${name} | Thabisa Shop`;
+    document.getElementById('launch-headline').value = `Shop ${name} | 10% Off + Free Shipping`;
     btn.innerHTML = original;
     lucide.createIcons();
   }, 1200);
