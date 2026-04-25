@@ -20,7 +20,7 @@ function getToken() {
 
 function api(endpoint, params = {}) {
   return axios.get(`${BASE_URL}${endpoint}`, {
-    params: { access_token: getToken(), app_id: APP_ID, ...params }
+    params: { access_token: getToken(), ...params }
   }).then(r => r.data).catch(err => {
     const msg = err.response?.data?.error?.message || err.message;
     logger.error(`Meta API error: ${msg}`, { endpoint });
@@ -34,7 +34,7 @@ function apiPost(endpoint, data = {}) {
     return Promise.resolve({ id: 'dry_run', dry_run: true });
   }
   return axios.post(`${BASE_URL}${endpoint}`, null, {
-    params: { access_token: getToken(), app_id: APP_ID, ...data }
+    params: { access_token: getToken(), ...data }
   }).then(r => r.data).catch(err => {
     const msg = err.response?.data?.error?.message || err.message;
     logger.error(`Meta API POST error: ${msg}`, { endpoint });
