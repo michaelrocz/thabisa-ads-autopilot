@@ -2,7 +2,9 @@
 // THABISA ADS AUTOPILOT — APP LOGIC
 // ============================================================
 
-const API_BASE = 'http://localhost:8008';
+const API_BASE = window.location.hostname === 'localhost' || window.location.protocol === 'file:'
+  ? 'http://localhost:8008'
+  : 'https://thabisa-ads-autopilot.vercel.app';
 let liveMode = false;
 let pollInterval = null;
 
