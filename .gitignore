@@ -1,0 +1,14 @@
+# ── Dependencies ───────────────────────────────────────────
+node_modules/
+
+# ── Environment (NEVER commit secrets) ─────────────────────
+.env
+server/.env
+
+# ── Logs ───────────────────────────────────────────────────
+server/logs/
+*.log
+
+# ── OS Files ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db

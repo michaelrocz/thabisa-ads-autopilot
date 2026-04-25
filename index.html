@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Thabisa Shop — 3× ROAS Ads Autopilot</title>
+<meta name="description" content="Autonomous ads management dashboard for Thabisa Shop targeting 3× ROAS across Google Ads and Meta Ads."/>
+<link rel="stylesheet" href="styles.css"/>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand-name">THABISA SHOP</div>
+    <div class="brand-tag">3× ROAS Ads Autopilot</div>
+  </div>
+  <div class="sidebar-status">
+    <span class="pulse-dot"></span>
+    Autopilot Active
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Overview</div>
+    <div class="nav-item active" onclick="showSection('dashboard',this)" id="nav-dashboard">
+      <i data-lucide="layout-dashboard"></i> Dashboard
+    </div>
+    <div class="nav-section-label">Targeting</div>
+    <div class="nav-item" onclick="showSection('segments',this)" id="nav-segments">
+      <i data-lucide="users"></i> Audience Segments
+    </div>
+    <div class="nav-section-label">Engine</div>
+    <div class="nav-item" onclick="showSection('algorithm',this)" id="nav-algorithm">
+      <i data-lucide="cpu"></i> Algorithm Engine
+    </div>
+    <div class="nav-item" onclick="showSection('rules',this)" id="nav-rules">
+      <i data-lucide="zap"></i> Rules Engine
+    </div>
+    <div class="nav-section-label">Platforms</div>
+    <div class="nav-item" onclick="showSection('platforms',this)" id="nav-platforms">
+      <i data-lucide="globe"></i> Platform Strategy
+    </div>
+    <div class="nav-section-label">Operations</div>
+    <div class="nav-item" onclick="showSection('cadence',this)" id="nav-cadence">
+      <i data-lucide="clock"></i> Monitoring Cadence
+    </div>
+    <div class="nav-item" onclick="showSection('reporting',this)" id="nav-reporting">
+      <i data-lucide="bar-chart-2"></i> Reporting
+    </div>
+    <div class="nav-item" onclick="showSection('setup',this)" id="nav-setup">
+      <i data-lucide="check-square"></i> Setup Checklist
+    </div>
+  </nav>
+  <div class="sidebar-footer">Target ROAS: 3.0× (300%)<br/>Last sync: Today, 09:00</div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Ads Autopilot Control Centre</div>
+      <div class="topbar-meta">Thabisa Shop · Google Ads + Meta Ads · UAE + India</div>
+    </div>
+    <div class="topbar-right">
+      <span class="topbar-badge badge-green">● Live</span>
+      <span class="topbar-badge badge-gold">Target: 3× ROAS</span>
+      <button id="btn-audit" onclick="triggerAudit()" style="padding:5px 14px;border-radius:6px;background:var(--gold-dim);border:1px solid var(--border-gold);color:var(--gold);font-size:0.72rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;transition:0.2s">▶ Run Audit Now</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ═══════════════ DASHBOARD ═══════════════ -->
+    <div class="section active" id="section-dashboard">
+      <div class="section-label">Overview</div>
+      <h1 class="page-title">Performance Dashboard</h1>
+      <p class="page-subtitle">Real-time signal monitoring across Google Ads and Meta Ads. Algorithm runs autonomously on a 24-hour minimum cadence.</p>
+
+      <div class="grid-4 mb-24">
+        <div class="stat-card gold">
+          <div class="stat-label">Blended ROAS</div>
+          <div class="stat-value gold" id="stat-roas">3.4×</div>
+          <div class="stat-sub">↑ Above 3× target</div>
+        </div>
+        <div class="stat-card emerald">
+          <div class="stat-label">Total Revenue (7d)</div>
+          <div class="stat-value emerald" id="stat-revenue">₹2.8L</div>
+          <div class="stat-sub">Google + Meta combined</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-label">Active Campaigns</div>
+          <div class="stat-value blue" id="stat-campaigns">14</div>
+          <div class="stat-sub">8 Google · 6 Meta</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-label">Alerts</div>
+          <div class="stat-value red" id="stat-alerts">2</div>
+          <div class="stat-sub">Require attention</div>
+        </div>
+      </div>
+
+      <div class="grid-2 mb-24">
+        <!-- ROAS Gauge -->
+        <div class="card card-gold">
+          <div class="section-label">Current ROAS</div>
+          <div class="gauge-wrap">
+            <svg class="gauge-svg" viewBox="0 0 200 110">
+              <defs>
+                <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#EF4444"/>
+                  <stop offset="40%" stop-color="#E07B39"/>
+                  <stop offset="75%" stop-color="#D4A84B"/>
+                  <stop offset="100%" stop-color="#22C997"/>
+                </linearGradient>
+              </defs>
+              <path d="M20,100 A90,90 0 0,1 180,100" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="14" stroke-linecap="round"/>
+              <path d="M20,100 A90,90 0 0,1 180,100" fill="none" stroke="url(#gaugeGrad)" stroke-width="14" stroke-linecap="round" stroke-dasharray="282.7" stroke-dashoffset="56" id="gaugeArc"/>
+              <text x="100" y="88" text-anchor="middle" font-family="Playfair Display" font-size="28" font-weight="700" fill="#D4A84B">3.4×</text>
+              <text x="100" y="104" text-anchor="middle" font-family="Inter" font-size="9" fill="#8A8799" letter-spacing="2">CURRENT ROAS</text>
+              <text x="20" y="116" text-anchor="middle" font-family="Inter" font-size="8" fill="#5A5870">0×</text>
+              <text x="100" y="116" text-anchor="middle" font-family="Inter" font-size="8" fill="#D4A84B">3× TARGET</text>
+              <text x="180" y="116" text-anchor="middle" font-family="Inter" font-size="8" fill="#5A5870">5×</text>
+            </svg>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+            <div class="score-band healthy" style="padding:8px 12px">
+              <span class="score-indicator"></span>
+              <span style="font-size:0.72rem;color:var(--emerald-light);font-weight:600">Google: 3.6×</span>
+            </div>
+            <div class="score-band healthy" style="padding:8px 12px">
+              <span class="score-indicator"></span>
+              <span style="font-size:0.72rem;color:var(--emerald-light);font-weight:600">Meta: 3.1×</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Signal Health -->
+        <div class="card">
+          <div class="section-label mb-16">Signal Health Monitor</div>
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:4px">
+              <span style="color:var(--text-muted)">Pixel Fire Rate</span>
+              <span style="color:var(--emerald-light);font-weight:600">98.4%</span>
+            </div>
+            <div class="progress-bar-wrap"><div class="progress-bar" style="width:98.4%;background:var(--emerald)"></div></div>
+          </div>
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:4px">
+              <span style="color:var(--text-muted)">CAPI Match Rate</span>
+              <span style="color:var(--emerald-light);font-weight:600">91.2%</span>
+            </div>
+            <div class="progress-bar-wrap"><div class="progress-bar" style="width:91.2%;background:var(--emerald)"></div></div>
+          </div>
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:4px">
+              <span style="color:var(--text-muted)">Budget Utilization</span>
+              <span style="color:var(--amber);font-weight:600">78.5%</span>
+            </div>
+            <div class="progress-bar-wrap"><div class="progress-bar" style="width:78.5%;background:var(--amber)"></div></div>
+          </div>
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:4px">
+              <span style="color:var(--text-muted)">Avg. Frequency</span>
+              <span style="color:var(--gold);font-weight:600">2.8 / 3.5 limit</span>
+            </div>
+            <div class="progress-bar-wrap"><div class="progress-bar" style="width:62%;background:var(--gold)"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:4px">
+              <span style="color:var(--text-muted)">Avg. CTR</span>
+              <span style="color:var(--emerald-light);font-weight:600">1.4%</span>
+            </div>
+            <div class="progress-bar-wrap"><div class="progress-bar" style="width:56%;background:var(--emerald)"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Score Classification -->
+      <div class="section-label mb-16">Campaign Health Classification</div>
+      <div style="margin-bottom:8px">
+        <div class="score-band healthy"><span class="score-indicator"></span><span class="score-range">ROAS ≥ 3×</span><span class="score-label" style="color:var(--emerald-light)">HEALTHY</span><span class="score-action">Scale budget immediately (+15–20% every 3 days)</span></div>
+        <div class="score-band watch"><span class="score-indicator"></span><span class="score-range">ROAS 1.5–3×</span><span class="score-label" style="color:var(--amber)">WATCH</span><span class="score-action">Diagnose delivery, creative, and audience targeting</span></div>
+        <div class="score-band critical"><span class="score-indicator"></span><span class="score-range">ROAS &lt; 1.5×</span><span class="score-label" style="color:var(--red)">CRITICAL</span><span class="score-action">Pause after minimum spend threshold reached</span></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ SEGMENTS ═══════════════ -->
+    <div class="section" id="section-segments">
+      <div class="section-label">Targeting</div>
+      <h1 class="page-title">Audience Segments</h1>
+      <p class="page-subtitle">Six precision-targeted audience stacks. Premium Homemakers and New Moms are priority segments for maximum ROAS. Click any card to expand details.</p>
+      <div class="grid-auto" id="segments-grid"></div>
+    </div>
+
+    <!-- ═══════════════ ALGORITHM ═══════════════ -->
+    <div class="section" id="section-algorithm">
+      <div class="section-label">Core Engine</div>
+      <h1 class="page-title">3-Layer Decision Engine</h1>
+      <p class="page-subtitle">Signal collection → Score &amp; classify → Act &amp; optimize. Runs autonomously on a 24-hour minimum cadence.</p>
+      <div class="algo-layers mb-32" id="algo-layers-container"></div>
+      <div class="divider"></div>
+      <div class="section-label mb-16">Flag Thresholds</div>
+      <div class="grid-2" id="flag-thresholds"></div>
+    </div>
+
+    <!-- ═══════════════ RULES ═══════════════ -->
+    <div class="section" id="section-rules">
+      <div class="section-label">Autopilot Rules</div>
+      <h1 class="page-title">Rules Engine</h1>
+      <p class="page-subtitle">Every trigger, threshold, and action the agent executes autonomously. Configured at setup and runs continuously.</p>
+      <div class="rules-tabs">
+        <div class="rules-tab scale active" onclick="showRulesTab('scale',this)">⬆ Scale</div>
+        <div class="rules-tab pause" onclick="showRulesTab('pause',this)">⏸ Pause</div>
+        <div class="rules-tab alert" onclick="showRulesTab('alert',this)">🔔 Alert</div>
+        <div class="rules-tab refresh" onclick="showRulesTab('refresh',this)">🔄 Refresh</div>
+      </div>
+      <div id="rules-panels"></div>
+    </div>
+
+    <!-- ═══════════════ PLATFORMS ═══════════════ -->
+    <div class="section" id="section-platforms">
+      <div class="section-label">Platform Strategy</div>
+      <h1 class="page-title">Google Ads &amp; Meta Ads</h1>
+      <p class="page-subtitle">Platform-native logic for each channel. Google Ads uses feed-driven Performance Max and Smart Shopping. Meta uses Advantage+ with lifestyle creative stacks.</p>
+      <div class="platform-tabs">
+        <div class="platform-tab active" onclick="showPlatformTab('google',this)">Google Ads</div>
+        <div class="platform-tab" onclick="showPlatformTab('meta',this)">Meta Ads</div>
+      </div>
+      <div id="platform-panels"></div>
+    </div>
+
+    <!-- ═══════════════ CADENCE ═══════════════ -->
+    <div class="section" id="section-cadence">
+      <div class="section-label">Operations</div>
+      <h1 class="page-title">Monitoring Cadence</h1>
+      <p class="page-subtitle">Structured review schedule ensuring proactive optimization at every time horizon. The autopilot handles daily execution autonomously.</p>
+      <div class="grid-auto" id="cadence-grid"></div>
+    </div>
+
+    <!-- ═══════════════ REPORTING ═══════════════ -->
+    <div class="section" id="section-reporting">
+      <div class="section-label">Reporting</div>
+      <h1 class="page-title">Weekly Report Framework</h1>
+      <p class="page-subtitle">Standardised report structure generated every 7 days. Covers blended performance, creative health, budget utilization, and next-week recommendations.</p>
+      <div class="grid-2" id="reporting-grid"></div>
+    </div>
+
+    <!-- ═══════════════ SETUP ═══════════════ -->
+    <div class="section" id="section-setup">
+      <div class="section-label">Pre-Launch</div>
+      <h1 class="page-title">Setup Checklist</h1>
+      <p class="page-subtitle">Complete all items before activating the autopilot agent. Progress is saved locally in your browser.</p>
+      <div class="grid-2">
+        <div id="checklist-container"></div>
+        <div>
+          <div class="section-label mb-16">Brand Safety — Never Do</div>
+          <div id="brand-safety-container"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

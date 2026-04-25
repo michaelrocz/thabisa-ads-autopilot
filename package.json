@@ -1,0 +1,9 @@
+{
+  "name": "thabisa-ads-autopilot",
+  "version": "1.0.0",
+  "description": "Thabisa Shop 3x ROAS Ads Autopilot Dashboard",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "cd server && npm run dev"
+  }
+}
