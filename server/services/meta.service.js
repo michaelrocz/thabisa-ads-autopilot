@@ -278,6 +278,6 @@ module.exports = {
   testConnection, getCampaigns, getAdSets, getInsights,
   getSummary, pauseAdSet, scaleBudget, decreaseBudget, 
   updateAdSetTargeting, updateStatus, pauseAd, getPixelHealth,
-  getLibraryAssets,
+  getLibraryAssets, getToken,
   metaTokenStorage
 };
