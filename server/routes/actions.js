@@ -86,6 +86,31 @@ router.get('/status', (req, res) => {
   });
 });
 
+// GET /api/actions/summary — Blended Meta + Google summary
+router.get('/summary', async (req, res) => {
+  try {
+    const [metaSummary, googleSummary] = await Promise.all([
+      meta.getSummary().catch(err => ({ error: err.message, platform: 'meta' })),
+      google.getSummary().catch(err => ({ error: err.message, platform: 'google' }))
+    ]);
+
+    const blended = {
+      total_spend: (metaSummary.total_spend || 0) + (googleSummary.total_spend || 0),
+      total_revenue: (metaSummary.total_revenue || 0) + (googleSummary.total_revenue || 0),
+      active_campaigns: (metaSummary.active_campaigns || 0) + (googleSummary.active_campaigns || 0),
+      platforms: {
+        meta: metaSummary,
+        google: googleSummary
+      }
+    };
+    blended.blended_roas = blended.total_spend > 0 ? blended.total_revenue / blended.total_spend : 0;
+    
+    res.json(blended);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/actions/update-token — update Meta token dynamically
 router.post('/update-token', (req, res) => {
   const { token } = req.body;

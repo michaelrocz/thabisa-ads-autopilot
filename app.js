@@ -92,20 +92,23 @@ function updateSetupStatus(data) {
 
 async function fetchDashboardData() {
   try {
-    const res = await apiFetch(`${API_BASE}/api/meta/summary`);
+    const res = await apiFetch(`${API_BASE}/api/actions/summary`);
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error || 'Connection error');
     }
-    const meta = await res.json();
+    const data = await res.json();
     
-    if (meta && !meta.error) {
+    if (data && !data.error) {
       liveMode = true;
-      updateDashboard(meta);
-      document.querySelector('.live-indicator').innerHTML = '<span class="pulse"></span> LIVE';
-      document.querySelector('.live-indicator').style.color = 'var(--emerald)';
+      updateDashboard(data);
+      const indicator = document.querySelector('.live-indicator');
+      if (indicator) {
+        indicator.innerHTML = '<span class="pulse"></span> LIVE';
+        indicator.style.color = 'var(--emerald)';
+      }
     } else {
-      throw new Error(meta.error || 'No data');
+      throw new Error(data.error || 'No data');
     }
 
     // Also fetch alerts
@@ -114,10 +117,13 @@ async function fetchDashboardData() {
     updateAlertBadge(alerts);
   } catch (e) {
     console.warn('Live data fetch failed:', e.message);
-    document.querySelector('.live-indicator').innerHTML = '<span class="pulse" style="background:var(--red)"></span> OFFLINE';
-    document.querySelector('.live-indicator').style.color = 'var(--red)';
+    const indicator = document.querySelector('.live-indicator');
+    if (indicator) {
+      indicator.innerHTML = '<span class="pulse" style="background:var(--red)"></span> OFFLINE';
+      indicator.style.color = 'var(--red)';
+    }
     // If it's a token error, show the modal
-    if (e.message.includes('token') || e.message.includes('valid')) {
+    if (e.message && (e.message.includes('token') || e.message.includes('valid'))) {
       showTokenModal(e.message);
     }
   }
@@ -165,37 +171,53 @@ async function updateToken() {
   }
 }
 
-function updateDashboard(meta) {
-  // ── Stat cards
-  setStatValue('stat-roas', meta.blended_roas.toFixed(1) + '×');
-  setStatValue('stat-revenue', '₹' + formatNumber(meta.total_revenue));
-  setStatValue('stat-campaigns', meta.active_campaigns);
+function updateDashboard(data) {
+  // ── Stat cards (Blended)
+  setStatValue('stat-roas', data.blended_roas.toFixed(1) + '×');
+  setStatValue('stat-spend', '₹' + formatNumber(data.total_spend));
+  setStatValue('stat-revenue', '₹' + formatNumber(data.total_revenue));
+  setStatValue('stat-campaigns', data.active_campaigns);
   
   // Update sub-stats
   const roasSub = document.querySelector('#stat-roas + .stat-sub');
   if (roasSub) {
-    roasSub.textContent = meta.blended_roas >= 3 ? '↑ Above 3× target' : '↓ Below target';
-    roasSub.style.color = meta.blended_roas >= 3 ? 'var(--emerald-light)' : 'var(--red)';
+    roasSub.textContent = data.blended_roas >= 3 ? '↑ Above 3× target' : '↓ Below target';
+    roasSub.style.color = data.blended_roas >= 3 ? 'var(--emerald-light)' : 'var(--red)';
   }
 
-  setStatValue('stat-campaigns-sub', `0 Google · ${meta.active_campaigns} Meta`);
-  setStatValue('roas-meta', `Meta: ${meta.blended_roas.toFixed(1)}×`);
-  setStatValue('gauge-val', meta.blended_roas.toFixed(1) + '×');
-
-  // ── ROAS gauge arc
-  const arc = document.getElementById('gaugeArc');
-  if (arc) {
-    const pct = Math.min(meta.blended_roas / 5, 1);
-    const dashOffset = 282.7 - (282.7 * pct);
-    arc.setAttribute('stroke-dashoffset', dashOffset.toFixed(1));
+  const spendSub = document.querySelector('#stat-spend + .stat-sub');
+  if (spendSub) {
+    spendSub.textContent = `₹${(data.total_spend/7).toFixed(0)} avg daily`;
   }
 
-  // ── Signal bars
-  updateProgressBar('bar-frequency', (meta.avg_frequency / 3.5) * 100,
-    meta.avg_frequency + ' / 3.5 limit', meta.avg_frequency > 3 ? 'var(--red)' : 'var(--gold)');
+  const meta = data.platforms.meta;
+  const goog = data.platforms.google;
 
-  // ── Live campaign table
-  renderCampaignTable(meta.campaigns_detail || []);
+  setStatValue('stat-campaigns-sub', `${goog.active_campaigns || 0} Google · ${meta.active_campaigns || 0} Meta`);
+  
+  if (meta && !meta.error) {
+    setStatValue('roas-meta', `Meta: ${meta.blended_roas.toFixed(1)}×`);
+    setStatValue('gauge-val', meta.blended_roas.toFixed(1) + '×');
+
+    // ── ROAS gauge arc (based on Meta for now, or could be blended)
+    const arc = document.getElementById('gaugeArc');
+    if (arc) {
+      const pct = Math.min(meta.blended_roas / 5, 1);
+      const dashOffset = 282.7 - (282.7 * pct);
+      arc.setAttribute('stroke-dashoffset', dashOffset.toFixed(1));
+    }
+
+    // ── Signal bars
+    updateProgressBar('bar-pixel', meta.signals?.pixel || 0, (meta.signals?.pixel || 0) + '% healthy', 'var(--emerald)');
+    updateProgressBar('bar-capi', meta.signals?.capi || 0, (meta.signals?.capi || 0) + '% match', 'var(--emerald)');
+    updateProgressBar('bar-budget', meta.signals?.budget || 0, (meta.signals?.budget || 0) + '% utilized', 'var(--amber)');
+    updateProgressBar('bar-frequency', (meta.avg_frequency / 3.5) * 100,
+      meta.avg_frequency.toFixed(1) + ' / 3.5 limit', meta.avg_frequency > 3 ? 'var(--red)' : 'var(--gold)');
+    updateProgressBar('bar-ctr', (meta.avg_ctr / 2) * 100, meta.avg_ctr.toFixed(2) + '% avg', meta.avg_ctr < 1 ? 'var(--red)' : 'var(--emerald)');
+
+    // ── Live campaign table
+    renderCampaignTable(meta.campaigns_detail || []);
+  }
 
   // ── Last updated timestamp
   const tsEl = document.querySelector('.topbar-meta');
@@ -265,7 +287,12 @@ function setStatValue(id, value) {
 
 function updateProgressBar(id, pct, label, color) {
   const bar = document.getElementById(id);
-  if (bar) { bar.style.width = Math.min(pct, 100) + '%'; bar.style.background = color || 'var(--gold)'; }
+  if (bar) { 
+    bar.style.width = Math.min(pct, 100) + '%'; 
+    bar.style.background = color || 'var(--gold)'; 
+  }
+  const valEl = document.getElementById(id.replace('bar-', 'val-'));
+  if (valEl) valEl.textContent = label;
 }
 
 function updateAlertBadge(alerts) {

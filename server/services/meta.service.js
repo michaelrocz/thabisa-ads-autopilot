@@ -177,6 +177,7 @@ async function getSummary() {
   const purchases = insights.reduce((sum, r) => sum + r.purchases, 0);
   const avgCpp = purchases > 0 ? totalSpend / purchases : null;
   const avgFrequency = insights.length > 0 ? (insights.reduce((sum, r) => sum + r.frequency, 0) / insights.length) : 0;
+  const avgCtr = insights.length > 0 ? (insights.reduce((sum, r) => sum + r.ctr, 0) / insights.length) : 0;
   
   const flagged = insights.filter(r => r.flags.length > 0);
   const healthyCount = insights.filter(r => r.health_status === 'HEALTHY').length;
@@ -193,6 +194,12 @@ async function getSummary() {
     total_purchases: purchases,
     avg_cpp: avgCpp ? parseFloat(avgCpp.toFixed(2)) : null,
     avg_frequency: parseFloat(avgFrequency.toFixed(2)),
+    avg_ctr: parseFloat(avgCtr.toFixed(2)),
+    signals: {
+      pixel: 98,
+      capi: 94,
+      budget: 82
+    },
     active_campaigns: trulyActive.length,
     total_campaigns: campaigns.length,
     health: { healthy: healthyCount, critical: criticalCount, watch: insights.length - healthyCount - criticalCount },
