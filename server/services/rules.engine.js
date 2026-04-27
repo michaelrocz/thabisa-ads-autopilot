@@ -10,7 +10,8 @@ const notifier = require('./notifier');
 const TARGET_ROAS = parseFloat(process.env.TARGET_ROAS || 3.0);
 const TARGET_CPP = parseFloat(process.env.TARGET_CPP || 2500);
 const MIN_SPEND = parseFloat(process.env.MIN_SPEND_BEFORE_PAUSE || 1000);
-const DRY_RUN = process.env.DRY_RUN !== 'false';
+const NOTIFICATION_EMAIL = 'doproperseo@gmail.com';
+const DRY_RUN = process.env.META_DRY_RUN === 'true';
 
 // In-memory history for consecutive-day ROAS tracking (reset on restart)
 // In production, replace with a lightweight SQLite or file-based store

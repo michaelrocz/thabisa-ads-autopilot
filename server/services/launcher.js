@@ -3,168 +3,106 @@ const FormData = require('form-data');
 const logger = require('../utils/logger');
 const meta = require('./meta.service');
 
-const APP_ID = '4198582757119959';
-
-/**
- * LAUNCHER SERVICE
- * Handles one-click creation of 'Perfect' campaigns on Meta and Google.
- */
+const PIXEL_ID = '1541255577299707';
+const PAGE_ID = '372752173550405';
+const INSTAGRAM_ID = '17841408447309607';
 
 class LauncherService {
   
-  async uploadImageToMeta(token, accountId, file) {
-    const form = new FormData();
-    form.append('bytes', file.buffer, { filename: file.originalname });
-    
-    const res = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/adimages`, form, {
-      params: { access_token: token },
-      headers: form.getHeaders()
-    });
-    
-    // Meta returns { images: { "filename": { hash: "..." } } }
-    const hash = Object.values(res.data.images)[0].hash;
-    return hash;
-  }
-
-  async uploadVideoToMeta(token, accountId, file) {
-    const form = new FormData();
-    form.append('source', file.buffer, { filename: file.originalname });
-    form.append('title', file.originalname);
-    
-    const res = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/advideos`, form, {
-      params: { access_token: token },
-      headers: form.getHeaders()
-    });
-    
-    return res.data.id; // Returns video_id
-  }
-
-  /**
-   * CREATE META CAMPAIGN (Advantage+ Shopping / ASC)
-   */
   async createMetaCampaign(config) {
-    const { name, budget, text, headline, files = [], assets = [] } = config;
-    const accountId = process.env.META_AD_ACCOUNT_ID;
-    const token = meta.getToken();
+    const { productName, budget, primaryText, headline, assets = [] } = config;
+    const accountId = process.env.META_AD_ACCOUNT_ID || 'act_2285838831476206';
 
-    logger.info(`Launcher: Creating Meta ASC Campaign: ${name}`);
+    logger.info(`Launcher: Starting Meta Launch for ${productName}`);
 
     try {
-      // 1. Create Campaign (Advantage+ Shopping)
-      // Note: ASC campaigns have specific objective and special_ad_categories constraints
-      // 1. Create Campaign (Sales Objective)
-      const campaignRes = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/campaigns`, {
-        name: `THABISA_SALES_AUTOPILOT_${name}`,
+      // 1. Create Campaign (CBO)
+      const campaign = await meta.apiPost(`/${accountId}/campaigns`, {
+        name: `AUTOPILOT_SALES_${productName}_${new Date().toISOString().split('T')[0]}`,
         objective: 'OUTCOME_SALES',
         status: 'PAUSED',
-        special_ad_categories: []
-      }, { params: { access_token: token } });
+        daily_budget: parseInt(budget) * 100,
+        bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
+        special_ad_categories: '[]'
+      });
 
-      const campaignId = campaignRes.data.id;
-
-      // 2. Create Ad Set (Optimized for Purchase Conversions)
-      const adSetRes = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/adsets`, {
-        name: `Broad_UAE_IN_${name}`,
-        campaign_id: campaignId,
-        daily_budget: parseInt(budget) * 100, 
-        billing_event: 'IMPRESSIONS',
+      // 2. Create Ad Set
+      const adSet = await meta.apiPost(`/${accountId}/adsets`, {
+        name: `Ad Set - Broad - ${productName}`,
+        campaign_id: campaign.id,
         optimization_goal: 'OFFSITE_CONVERSIONS',
-        promoted_object: { pixel_id: '1541255577299707', custom_event_type: 'PURCHASE' },
-        targeting: { 
+        billing_event: 'IMPRESSIONS',
+        promoted_object: JSON.stringify({
+          pixel_id: PIXEL_ID,
+          custom_event_type: 'PURCHASE'
+        }),
+        targeting: JSON.stringify({ 
           geo_locations: { countries: ['AE', 'IN'] },
           publisher_platforms: ['facebook', 'instagram'],
           age_min: 18
-        },
+        }),
         status: 'ACTIVE'
-      }, { params: { access_token: token } });
+      });
 
-      const adSetId = adSetRes.data.id;
+      // 3. Create Ads
+      const parsedAssets = typeof assets === 'string' ? JSON.parse(assets) : assets;
+      const ads = [];
 
-      // 3. Create Multiple Ads (One for each creative selected)
-      const adResults = [];
-      const creativesToProcess = assets.length > 0 ? assets : [];
-
-      for (let i = 0; i < creativesToProcess.length; i++) {
-        const item = creativesToProcess[i];
+      for (let i = 0; i < parsedAssets.length; i++) {
+        const item = parsedAssets[i];
         
-        // Create Creative first
+        // Build Creative according to the "Beach Ad" Gold Standard
         const creativeData = {
-          name: `Creative_${name}_${i}`,
-          object_story_spec: {
-            page_id: '372752173550405',
-            link_data: {
-              call_to_action: { type: 'SHOP_NOW' },
-              link: 'https://thabisa.shop',
-              message: text,
-              name: headline
-            }
-          }
+          page_id: PAGE_ID,
+          instagram_user_id: INSTAGRAM_ID
         };
 
-        if (item.type === 'image') {
-          creativeData.object_story_spec.link_data.image_hash = item.id;
-        } else {
-          creativeData.object_story_spec.video_data = {
+        if (item.type === 'video') {
+          creativeData.video_data = {
             video_id: item.id,
-            image_url: item.thumbnail_url || item.url,
-            call_to_action: { type: 'SHOP_NOW' }
+            image_hash: 'f6fe5dbb55cc29774850b5b48a8e1f8c', // Using the confirmed valid thumbnail hash
+            call_to_action: {
+              type: 'SHOP_NOW',
+              value: { link: 'https://thabisa.shop/' }
+            },
+            message: primaryText,
+            title: headline
           };
-          delete creativeData.object_story_spec.link_data;
+        } else {
+          creativeData.link_data = {
+            image_hash: item.id,
+            call_to_action: { type: 'SHOP_NOW' },
+            link: 'https://thabisa.shop/',
+            message: primaryText,
+            name: headline
+          };
         }
 
-        const creativeRes = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/adcreatives`, creativeData, {
-          params: { access_token: token }
+        const creative = await meta.apiPost(`/${accountId}/adcreatives`, {
+          name: `Creative - ${productName} - ${i}`,
+          object_story_spec: JSON.stringify(creativeData)
+        });
+        
+        const ad = await meta.apiPost(`/${accountId}/ads`, {
+          name: `Ad - ${productName} - ${i}`,
+          adset_id: adSet.id,
+          creative: JSON.stringify({ creative_id: creative.id }),
+          status: 'ACTIVE'
         });
 
-        // Link Creative to Ad Set
-        const adRes = await axios.post(`https://graph.facebook.com/v21.0/${accountId}/ads`, {
-          name: `Ad_${name}_v${i+1}`,
-          adset_id: adSetId,
-          creative: { creative_id: creativeRes.data.id },
-          tracking_specs: [ { action_type: ['offsite_conversion'], fb_pixel: ['1541255577299707'] } ],
-          status: 'PAUSED'
-        }, { params: { access_token: token } });
-
-        adResults.push(adRes.data.id);
+        ads.push(ad.id);
       }
 
-      logger.info(`Launcher: Gold Standard Campaign created with ${adResults.length} ads.`);
-      return { ok: true, campaignId, adSetId, adIds: adResults };
-    } catch (e) {
-      const errorMsg = e.response?.data?.error?.message || e.message;
-      const userMsg = e.response?.data?.error?.error_user_msg || '';
-      const userTitle = e.response?.data?.error?.error_user_title || '';
-      const fullMessage = [userTitle, userMsg, errorMsg].filter(Boolean).join(' - ');
-      
-      logger.error(`Launcher: Meta Creation Failed: ${fullMessage}`);
-      throw new Error(fullMessage);
-    }
-  }
+      return {
+        success: true,
+        campaign_id: campaign.id,
+        adset_id: adSet.id,
+        ads
+      };
 
-  /**
-   * CREATE GOOGLE CAMPAIGN (Performance Max / PMax)
-   */
-  async createGoogleCampaign(config) {
-    const { name, budget, text, headline } = config;
-    const customerId = process.env.GOOGLE_CUSTOMER_ID;
-
-    logger.info(`Launcher: Creating Google PMax Campaign: ${name}`);
-
-    // Google Ads API requires a more complex gRPC or REST structure.
-    // This is a simulated implementation using the REST endpoint pattern.
-    try {
-      // 1. Create Budget
-      // 2. Create Campaign (AdvertisingChannelType: PERFORMANCE_MAX)
-      // 3. Create Asset Group
-      
-      logger.info(`Launcher: Google PMax Campaign ${name} initialized in draft.`);
-      
-      // For this prototype, we'll return a mock success
-      // Real implementation would use the 'google-ads-api' library
-      return { ok: true, campaignName: name };
-    } catch (e) {
-      logger.error(`Launcher: Google Creation Failed: ${e.message}`);
-      throw new Error(e.message);
+    } catch (error) {
+      logger.error(`Launcher: Meta Creation Failed: ${error.message}`);
+      throw error;
     }
   }
 }

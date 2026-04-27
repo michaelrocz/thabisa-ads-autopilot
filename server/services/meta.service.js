@@ -9,9 +9,9 @@ const metaTokenStorage = new AsyncLocalStorage();
 
 const BASE_URL = `https://graph.facebook.com/${process.env.META_API_VERSION || 'v21.0'}`;
 const ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID || 'act_2285838831476206'; 
-const PIXEL_ID = '1541255577299707';
+const PIXEL_ID = '2089219804702392';
 const APP_ID = '4198582757119959';
-const DRY_RUN = process.env.DRY_RUN !== 'false';
+const DRY_RUN = process.env.META_DRY_RUN === 'true';
 
 // ── HELPERS ─────────────────────────────────────────────────
 function getToken() {
@@ -19,13 +19,17 @@ function getToken() {
 }
 
 function api(endpoint, params = {}) {
-  return axios.get(`${BASE_URL}${endpoint}`, {
-    params: { access_token: getToken(), ...params }
-  }).then(r => r.data).catch(err => {
-    const msg = err.response?.data?.error?.message || err.message;
-    logger.error(`Meta API error: ${msg}`, { endpoint });
-    throw new Error(`Meta API: ${msg}`);
-  });
+  const token = getToken();
+  let url = `${BASE_URL}${endpoint}`;
+  const query = new URLSearchParams({ access_token: token, ...params }).toString();
+  
+  return axios.get(`${url}?${query}`)
+    .then(r => r.data)
+    .catch(err => {
+      const msg = err.response?.data?.error?.message || err.message;
+      logger.error(`Meta API error: ${msg}`, { url: `${url}?${query}` });
+      throw new Error(`Meta API: ${msg}`);
+    });
 }
 
 function apiPost(endpoint, data = {}) {
@@ -33,13 +37,16 @@ function apiPost(endpoint, data = {}) {
     logger.info(`[DRY RUN] POST ${endpoint}`, data);
     return Promise.resolve({ id: 'dry_run', dry_run: true });
   }
-  return axios.post(`${BASE_URL}${endpoint}`, null, {
-    params: { access_token: getToken(), ...data }
-  }).then(r => r.data).catch(err => {
-    const msg = err.response?.data?.error?.message || err.message;
-    logger.error(`Meta API POST error: ${msg}`, { endpoint });
-    throw new Error(`Meta API: ${msg}`);
-  });
+  const token = getToken();
+  let url = `${BASE_URL}${endpoint}?access_token=${token}`;
+
+  return axios.post(url, data)
+    .then(r => r.data)
+    .catch(err => {
+      const msg = err.response?.data?.error?.message || err.message;
+      logger.error(`Meta API POST error: ${msg}`, { url, data: err.response?.data });
+      throw new Error(`Meta API: ${msg}`);
+    });
 }
 
 // ── CONNECTION TEST ─────────────────────────────────────────
@@ -98,13 +105,19 @@ function enrichInsightRow(row) {
   const cpp = purchases > 0 ? spend / purchases : null;
   const ctr = parseFloat(row.ctr || 0);
   const frequency = parseFloat(row.frequency || 0);
-
   let healthStatus = 'WATCH';
-  if (roas >= parseFloat(process.env.TARGET_ROAS || 3)) healthStatus = 'HEALTHY';
-  else if (roas < 1.5) healthStatus = 'CRITICAL';
+  const isNew = spend < 1500; // New campaigns under ₹1500 spend
+  
+  if (isNew && purchases === 0) {
+    healthStatus = 'LEARNING';
+  } else if (roas >= parseFloat(process.env.TARGET_ROAS || 3)) {
+    healthStatus = 'HEALTHY';
+  } else if (!isNew && roas < 1.5) {
+    healthStatus = 'CRITICAL';
+  }
 
   const flags = [];
-  if (ctr < 0.8) flags.push('CREATIVE_FATIGUE');
+  if (ctr < 0.8 && !isNew) flags.push('CREATIVE_FATIGUE');
   if (frequency > 3.5) flags.push('AUDIENCE_BURN');
   const targetCpp = parseFloat(process.env.TARGET_CPP || 2500);
   if (cpp && cpp > targetCpp * 2) flags.push('CPP_CRITICAL');
@@ -185,12 +198,24 @@ async function getSummary() {
     health: { healthy: healthyCount, critical: criticalCount, watch: insights.length - healthyCount - criticalCount },
     flagged_count: flagged.length,
     flagged,
-    campaigns_detail: insights.map(row => {
-      const campaign = campaigns.find(c => c.id === row.campaign_id);
-      return {
-        ...row,
-        status: campaign ? campaign.status : 'UNKNOWN',
-        daily_budget: campaign ? (parseFloat(campaign.daily_budget || campaign.lifetime_budget || 0) / 100) : 0
+    campaigns_detail: trulyActive.map(campaign => {
+      const insight = insights.find(r => r.campaign_id === campaign.id);
+      return insight ? {
+        ...insight,
+        status: campaign.status,
+        daily_budget: (parseFloat(campaign.daily_budget || campaign.lifetime_budget || 0) / 100)
+      } : {
+        campaign_id: campaign.id,
+        campaign_name: campaign.name,
+        spend: "0.00",
+        roas: 0,
+        purchases: 0,
+        status: campaign.status,
+        health_status: 'WATCH',
+        flags: [],
+        ctr: 0,
+        frequency: 0,
+        daily_budget: (parseFloat(campaign.daily_budget || campaign.lifetime_budget || 0) / 100)
       };
     })
   };
@@ -283,6 +308,6 @@ module.exports = {
   testConnection, getCampaigns, getAdSets, getInsights,
   getSummary, pauseAdSet, scaleBudget, decreaseBudget, 
   updateAdSetTargeting, updateStatus, pauseAd, getPixelHealth,
-  getLibraryAssets, getToken,
+  getLibraryAssets, getToken, api, apiPost,
   metaTokenStorage
 };
