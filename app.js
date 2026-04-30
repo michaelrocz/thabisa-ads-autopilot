@@ -174,9 +174,27 @@ async function updateToken() {
 function updateDashboard(data) {
   // ── Stat cards (Blended)
   setStatValue('stat-roas', data.blended_roas.toFixed(1) + '×');
+  // ── Baseline for Survival Plan Launch (2026-04-30)
+  // We subtract spend that happened today BEFORE the V3 relaunch
+  const todayKey = new Date().toISOString().split('T')[0]; 
+  let spendSinceLaunch = data.total_spend_today || 0;
+  
+  if (todayKey === '2026-04-30') {
+    const baseline = 1550.73; // Total blended spend before V3 launch
+    spendSinceLaunch = Math.max(0, spendSinceLaunch - baseline);
+  }
+
   setStatValue('stat-spend', '₹' + formatNumber(data.total_spend));
   setStatValue('stat-revenue', '₹' + formatNumber(data.total_revenue));
   setStatValue('stat-campaigns', data.active_campaigns);
+  setStatValue('stat-spend-today', '₹' + formatNumber(spendSinceLaunch));
+
+  // Set survival day
+  const planStart = new Date('2026-04-30');
+  const today = new Date();
+  const diffDays = Math.ceil((today - planStart) / (1000 * 60 * 60 * 24)) || 1;
+  setStatValue('survival-day', `Day ${diffDays} of 10`);
+
   
   // Update sub-stats
   const roasSub = document.querySelector('#stat-roas + .stat-sub');
@@ -214,10 +232,17 @@ function updateDashboard(data) {
     updateProgressBar('bar-frequency', (meta.avg_frequency / 3.5) * 100,
       meta.avg_frequency.toFixed(1) + ' / 3.5 limit', meta.avg_frequency > 3 ? 'var(--red)' : 'var(--gold)');
     updateProgressBar('bar-ctr', (meta.avg_ctr / 2) * 100, meta.avg_ctr.toFixed(2) + '% avg', meta.avg_ctr < 1 ? 'var(--red)' : 'var(--emerald)');
-
-    // ── Live campaign table
-    renderCampaignTable(meta.campaigns_detail || []);
   }
+
+  // ── Live campaign table
+  const allCampaigns = [];
+  if (meta && meta.campaigns_detail) {
+    allCampaigns.push(...meta.campaigns_detail.map(c => ({...c, platform: 'meta'})));
+  }
+  if (goog && goog.campaigns_detail) {
+    allCampaigns.push(...goog.campaigns_detail.map(c => ({...c, platform: 'google'})));
+  }
+  renderCampaignTable(allCampaigns);
 
   // ── Last updated timestamp
   const tsEl = document.querySelector('.topbar-meta');
@@ -231,7 +256,7 @@ function renderCampaignTable(campaigns) {
     const div = document.createElement('div');
     div.id = 'live-campaign-table-wrap';
     div.innerHTML = `
-      <div class="section-label mb-16" style="margin-top:28px">Live Campaign Performance — Meta (7d)</div>
+      <div class="section-label mb-16" style="margin-top:28px">Live Campaign Performance — All Platforms (7d)</div>
       <div style="overflow-x:auto">
         <table id="live-campaign-table" style="width:100%;border-collapse:collapse;font-size:0.78rem"></table>
       </div>`;
@@ -245,24 +270,40 @@ function renderCampaignTable(campaigns) {
   ).join('')}</tr></thead>`;
 
   const healthColor = { HEALTHY: 'var(--emerald-light)', WATCH: 'var(--amber)', CRITICAL: 'var(--red)' };
-  const sorted = [...campaigns].sort((a, b) => {
-    if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') return -1;
-    if (a.status !== 'ACTIVE' && b.status === 'ACTIVE') return 1;
-    // secondary sort by spend
-    return parseFloat(b.spend) - parseFloat(a.spend);
+  
+  // Filter and Sort: Show only ACTIVE Google campaigns, but show all Meta campaigns (or sorted)
+  // User explicitly asked to only show active Google camps.
+  const filtered = campaigns.filter(c => {
+    if (c.platform === 'google') {
+      return c.status === 2 || c.status === 'ENABLED' || c.status === 'ACTIVE';
+    }
+    return true; // Keep all Meta for now, or could filter those too if needed
   });
 
-  const rows = sorted.slice(0, 15).map(c => {
+  const sorted = [...filtered].sort((a, b) => {
+    const aActive = (a.status === 'ACTIVE' || a.status === 2 || a.status === 'ENABLED');
+    const bActive = (b.status === 'ACTIVE' || b.status === 2 || b.status === 'ENABLED');
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+    return parseFloat(b.spend || 0) - parseFloat(a.spend || 0);
+  });
+
+  const rows = sorted.slice(0, 20).map(c => {
     const col = healthColor[c.health_status] || 'var(--text-muted)';
     const flags = c.flags?.length ? `<span title="${c.flags.join(', ')}" style="color:var(--amber);margin-left:4px">⚠</span>` : '';
-    const isActive = c.status === 'ACTIVE';
+    const isActive = (c.status === 'ACTIVE' || c.status === 2 || c.status === 'ENABLED');
     const activeStyle = isActive ? 'background:rgba(34,201,151,0.08);border-left:4px solid var(--emerald)' : 'border-left:4px solid transparent';
     const activeBadge = isActive ? '<span style="background:var(--emerald);color:white;padding:2px 6px;border-radius:4px;font-size:0.6rem;font-weight:800;margin-left:8px;vertical-align:middle">ACTIVE</span>' : '';
     
+    const platformBadge = c.platform === 'google' 
+      ? '<span style="background:rgba(245,158,11,0.15);color:var(--amber);padding:2px 4px;border-radius:3px;font-size:0.6rem;font-weight:800;margin-right:6px">GOOGLE</span>'
+      : '<span style="background:rgba(59,130,246,0.15);color:var(--blue);padding:2px 4px;border-radius:3px;font-size:0.6rem;font-weight:800;margin-right:6px">FB/META</span>';
+
     return `<tr style="border-bottom:1px solid var(--border);${activeStyle}">
       <td style="padding:12px 12px;color:var(--text);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.campaign_name}">
         <span style="display:flex;align-items:center;gap:8px">
           ${isActive ? '<span class="pulse-dot" style="width:8px;height:8px;background:var(--emerald);box-shadow:0 0 8px var(--emerald)"></span>' : ''}
+          ${platformBadge}
           <span style="font-weight:${isActive ? '700' : '400'}">${c.campaign_name}</span>
           ${activeBadge}
         </span>
@@ -277,7 +318,7 @@ function renderCampaignTable(campaigns) {
     </tr>`;
   }).join('');
 
-  container.innerHTML = headerRow + `<tbody>${rows || '<tr><td colspan="8" style="padding:16px;color:var(--text-dim);text-align:center">No campaign data</td></tr>'}</tbody>`;
+  container.innerHTML = headerRow + `<tbody>${rows || '<tr><td colspan="8" style="padding:16px;color:var(--text-dim);text-align:center">No active campaign data</td></tr>'}</tbody>`;
 }
 
 function setStatValue(id, value) {

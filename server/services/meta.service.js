@@ -11,7 +11,7 @@ const BASE_URL = `https://graph.facebook.com/${process.env.META_API_VERSION || '
 const ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID || 'act_2285838831476206'; 
 const PIXEL_ID = '2089219804702392';
 const APP_ID = '4198582757119959';
-const DRY_RUN = process.env.META_DRY_RUN === 'true';
+const DRY_RUN = process.env.DRY_RUN !== 'false';
 
 // ── HELPERS ─────────────────────────────────────────────────
 function getToken() {
@@ -162,16 +162,17 @@ function getPurchaseCount(actions = []) {
 
 // ── SUMMARY (FOR DASHBOARD) ─────────────────────────────────
 async function getSummary() {
-  let insights = await getInsights('this_month', 'campaign');
-  if (insights.length === 0) {
-    insights = await getInsights('last_30d', 'campaign');
-  }
-  const campaigns = await getCampaigns();
+  const [insights, insightsToday, campaigns] = await Promise.all([
+    getInsights('this_month', 'campaign'),
+    getInsights('today', 'campaign').catch(() => []),
+    getCampaigns()
+  ]);
   
   // Only count campaigns that are actually ACTIVE in Meta
   const trulyActive = campaigns.filter(c => c.status === 'ACTIVE');
   
   const totalSpend = insights.reduce((sum, r) => sum + parseFloat(r.spend), 0);
+  const totalSpendToday = insightsToday.reduce((sum, r) => sum + parseFloat(r.spend), 0);
   const totalRevenue = insights.reduce((sum, r) => sum + parseFloat(r.purchase_value), 0);
   const roas = totalSpend > 0 ? (totalRevenue / totalSpend) : 0;
   const purchases = insights.reduce((sum, r) => sum + r.purchases, 0);
@@ -189,6 +190,7 @@ async function getSummary() {
     currency: process.env.CURRENCY || 'INR',
     period: 'this_month',
     total_spend: parseFloat(totalSpend.toFixed(2)),
+    total_spend_today: parseFloat(totalSpendToday.toFixed(2)),
     total_revenue: parseFloat(totalRevenue.toFixed(2)),
     blended_roas: parseFloat(roas.toFixed(2)),
     total_purchases: purchases,
@@ -239,16 +241,32 @@ async function pauseAdSet(adSetId, reason) {
 }
 
 async function scaleBudget(campaignId, currentBudget, reason) {
-  const targetCpp = parseFloat(process.env.TARGET_CPP || 2500);
-  const pct = currentBudget < targetCpp * 5 ? 0.20 : 0.15; // 20% if smaller, 15% if larger
+  const targetCpp = 1200; 
+  const pct = 0.20; 
   const newBudget = Math.round(currentBudget * (1 + pct));
   logger.logAction({
     platform: 'META', objectId: campaignId, action: 'SCALE_BUDGET',
     reason, oldValue: currentBudget, newValue: newBudget
   });
   if (DRY_RUN) return { dry_run: true, action: 'SCALE_BUDGET', id: campaignId, old: currentBudget, new: newBudget };
-  return apiPost(`/${campaignId}`, { daily_budget: newBudget });
+  return apiPost(`/${campaignId}`, { daily_budget: newBudget * 100 });
 }
+
+async function getAdSets(campaignId) {
+  const res = await api(`/${campaignId}/adsets`, { fields: 'id,name,status,targeting' });
+  return res.data;
+}
+
+async function updateAdSetTargeting(adSetId, targeting) {
+  logger.logAction({
+    platform: 'META', objectId: adSetId, action: 'UPDATE_TARGETING',
+    reason: 'Audience Refinement for High Purchasing Power',
+    newValue: JSON.stringify(targeting)
+  });
+  if (DRY_RUN) return { dry_run: true, action: 'UPDATE_TARGETING', id: adSetId };
+  return apiPost(`/${adSetId}`, { targeting });
+}
+
 
 async function decreaseBudget(campaignId, currentBudget, reason) {
   const newBudget = Math.max(500, Math.round(currentBudget * 0.90)); // -10%, min 500

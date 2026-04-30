@@ -1,0 +1,52 @@
+require('dotenv').config();
+const ms = require('./server/services/meta.service');
+
+async function optimizeMetaTargeting() {
+  const updates = [
+    {
+      id: '120243578093080559', // Kids & Baby
+      interests: [
+        { id: '6003232518610', name: 'Parenting' },
+        { id: '6003415393053', name: "Children's clothing" }
+      ]
+    },
+    {
+      id: '120243578101230559', // Home Decor
+      interests: [
+        { id: '6002920953955', name: 'Interior design' },
+        { id: '6003385735404', name: 'Home decorating ideas' }
+      ]
+    },
+    {
+      id: '120243578106460559', // Travel/Bags
+      interests: [
+        { id: '6003288328927', name: 'Ethical consumerism' }
+      ]
+    }
+  ];
+
+  for (const update of updates) {
+    try {
+      console.log(`Updating AdSet ${update.id}...`);
+      
+      const currentRes = await ms.api(`/${update.id}`, { fields: 'targeting' });
+      const current = currentRes.targeting;
+
+      const newTargeting = {
+        ...current,
+        flexible_spec: [
+          {
+            interests: update.interests
+          }
+        ]
+      };
+
+      const result = await ms.updateAdSetTargeting(update.id, newTargeting);
+      console.log(`Result for ${update.id}:`, JSON.stringify(result));
+    } catch (e) {
+      console.error(`Failed to update ${update.id}:`, e.message);
+    }
+  }
+}
+
+optimizeMetaTargeting();

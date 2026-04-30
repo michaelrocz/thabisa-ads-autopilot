@@ -8,9 +8,11 @@ const rulesEngine = require('./rules.engine');
 let lastAuditResult = null;
 let schedulerStarted = false;
 
-// ── CADENCE ──────────────────────────────────────────────────
+// Every hour at the top of the hour
+const HOURLY_CRON    = '0 * * * *';
 // Every 24 hours at 9:00 AM — full daily audit
 const DAILY_CRON    = '0 9 * * *';
+
 // Every 3 days at 9:00 AM — budget shift review (Mon, Thu)
 const THREE_DAY_CRON = '0 9 * * 1,4';
 // Every Monday at 9:30 AM — weekly creative + bid audit
@@ -21,6 +23,38 @@ const BIWEEKLY_CRON = '0 9 1,15 * *';
 function startScheduler() {
   if (schedulerStarted) return;
   schedulerStarted = true;
+
+  // ── HOURLY PERFORMANCE UPDATE ────────────────────────────
+  cron.schedule(HOURLY_CRON, async () => {
+    logger.info('SCHEDULER: Hourly performance update triggered');
+    try {
+      const meta = require('./meta.service');
+      const google = require('./google.service');
+      const notifier = require('./notifier');
+
+      const [mSummary, gSummary] = await Promise.all([
+        meta.getSummary(),
+        google.getSummary()
+      ]);
+
+      const baseline = 1550.73; // Our launch baseline
+      const totalSpendToday = (mSummary.total_spend_today || 0) + (gSummary.total_spend_today || 0);
+      const spendSinceLaunch = Math.max(0, totalSpendToday - baseline);
+
+      const data = {
+        total_spend_today: spendSinceLaunch.toFixed(2),
+        total_purchases: (mSummary.total_purchases || 0) + (gSummary.total_conversions || 0),
+        campaigns: [
+          ...mSummary.campaigns_detail.filter(c => c.status === 'ACTIVE').map(c => ({ name: c.campaign_name, roas: c.roas })),
+          ...gSummary.campaigns_detail.filter(c => c.status === 2 || c.status === 'ENABLED').map(c => ({ name: c.campaign_name, roas: c.roas }))
+        ]
+      };
+
+      await notifier.sendHourlyUpdate(data);
+    } catch (err) {
+      logger.error('SCHEDULER: Hourly update failed', { error: err.message });
+    }
+  }, { timezone: 'Asia/Kolkata' });
 
   // ── DAILY AUDIT ──────────────────────────────────────────
   cron.schedule(DAILY_CRON, async () => {

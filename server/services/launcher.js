@@ -3,7 +3,7 @@ const FormData = require('form-data');
 const logger = require('../utils/logger');
 const meta = require('./meta.service');
 
-const PIXEL_ID = '1541255577299707';
+const PIXEL_ID = '2089219804702392';
 const PAGE_ID = '372752173550405';
 const INSTAGRAM_ID = '17841408447309607';
 
