@@ -57,13 +57,15 @@ class LauncherService {
           instagram_user_id: INSTAGRAM_ID
         };
 
+        const landingUrl = item.link || 'https://thabisa.shop/';
+
         if (item.type === 'video') {
           creativeData.video_data = {
             video_id: item.id,
             image_hash: 'f6fe5dbb55cc29774850b5b48a8e1f8c', // Using the confirmed valid thumbnail hash
             call_to_action: {
               type: 'SHOP_NOW',
-              value: { link: 'https://thabisa.shop/' }
+              value: { link: landingUrl }
             },
             message: primaryText,
             title: headline
@@ -72,7 +74,7 @@ class LauncherService {
           creativeData.link_data = {
             image_hash: item.id,
             call_to_action: { type: 'SHOP_NOW' },
-            link: 'https://thabisa.shop/',
+            link: landingUrl,
             message: primaryText,
             name: headline
           };

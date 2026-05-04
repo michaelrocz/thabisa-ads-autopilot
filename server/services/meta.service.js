@@ -163,10 +163,16 @@ function getPurchaseCount(actions = []) {
 // ── SUMMARY (FOR DASHBOARD) ─────────────────────────────────
 async function getSummary() {
   const [insights, insightsToday, campaigns] = await Promise.all([
-    getInsights('this_month', 'campaign'),
+    getInsights('last_7d', 'campaign'),
     getInsights('today', 'campaign').catch(() => []),
     getCampaigns()
   ]);
+
+  for (const t of insightsToday) {
+    if (!insights.some(r => r.campaign_id === t.campaign_id)) {
+      insights.push(t);
+    }
+  }
   
   // Only count campaigns that are actually ACTIVE in Meta
   const trulyActive = campaigns.filter(c => c.status === 'ACTIVE');
@@ -188,7 +194,7 @@ async function getSummary() {
     platform: 'meta',
     account_id: ACCOUNT_ID,
     currency: process.env.CURRENCY || 'INR',
-    period: 'this_month',
+    period: 'last_7d',
     total_spend: parseFloat(totalSpend.toFixed(2)),
     total_spend_today: parseFloat(totalSpendToday.toFixed(2)),
     total_revenue: parseFloat(totalRevenue.toFixed(2)),
@@ -208,7 +214,7 @@ async function getSummary() {
     flagged_count: flagged.length,
     flagged,
     campaigns_detail: trulyActive.map(campaign => {
-      const insight = insights.find(r => r.campaign_id === campaign.id);
+      const insight = insights.find(r => r.campaign_id === campaign.id) || insightsToday.find(r => r.campaign_id === campaign.id);
       return insight ? {
         ...insight,
         status: campaign.status,

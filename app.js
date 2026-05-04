@@ -4,7 +4,7 @@
 
 const API_BASE = window.location.hostname === 'localhost' || window.location.protocol === 'file:'
   ? 'http://localhost:8008'
-  : 'https://thabisa-ads-autopilot.vercel.app';
+  : '';
 let liveMode = false;
 let pollInterval = null;
 let serverConfig = null;
@@ -186,14 +186,19 @@ function updateDashboard(data) {
 
   setStatValue('stat-spend', '₹' + formatNumber(data.total_spend));
   setStatValue('stat-revenue', '₹' + formatNumber(data.total_revenue));
+  
+  const metaPurchases = data.platforms?.meta?.total_purchases || 0;
+  const googleConversions = data.platforms?.google?.total_conversions || 0;
+  setStatValue('stat-conversions', metaPurchases + googleConversions);
+  
   setStatValue('stat-campaigns', data.active_campaigns);
   setStatValue('stat-spend-today', '₹' + formatNumber(spendSinceLaunch));
 
   // Set survival day
-  const planStart = new Date('2026-04-30');
+  const planStart = new Date('2026-05-01');
   const today = new Date();
   const diffDays = Math.ceil((today - planStart) / (1000 * 60 * 60 * 24)) || 1;
-  setStatValue('survival-day', `Day ${diffDays} of 10`);
+  setStatValue('survival-day', `Day ${diffDays} of 10 — Last 4 Days Spent: ₹3,144`);
 
   
   // Update sub-stats
@@ -349,8 +354,7 @@ function updateAlertBadge(alerts) {
 function formatNumber(n) {
   const num = parseFloat(n) || 0;
   if (num >= 100000) return (num/100000).toFixed(1) + 'L';
-  if (num >= 1000) return (num/1000).toFixed(1) + 'k';
-  return num.toFixed(0);
+  return Math.round(num).toLocaleString('en-IN');
 }
 
 // ── Manual audit trigger (for UI button) ────────────────────

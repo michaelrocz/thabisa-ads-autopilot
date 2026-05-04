@@ -134,7 +134,7 @@ async function getCampaignMetrics(dateRange = 'LAST_7_DAYS') {
 async function getSummary() {
   const campaigns = await getCampaigns();
   const [metrics, metricsToday] = await Promise.all([
-    getCampaignMetrics('THIS_MONTH'),
+    getCampaignMetrics('LAST_7_DAYS'),
     getCampaignMetrics('TODAY').catch(() => [])
   ]);
 
@@ -153,7 +153,7 @@ async function getSummary() {
   return {
     platform: 'google',
     currency: process.env.CURRENCY || 'INR',
-    period: 'this_month',
+    period: 'last_7d',
     total_spend: parseFloat(totalSpend.toFixed(2)),
     total_spend_today: parseFloat(totalSpendToday.toFixed(2)),
     total_revenue: parseFloat(totalRevenue.toFixed(2)),

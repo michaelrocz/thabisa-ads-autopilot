@@ -13,5 +13,9 @@ function setEnv(name, value) {
   }
 }
 
+require('dotenv').config();
+
+setEnv('META_ACCESS_TOKEN', process.env.META_ACCESS_TOKEN);
 setEnv('META_PAGE_ID', '372752173550405');
-setEnv('META_PIXEL_ID', '1541255577299707');
+setEnv('META_PIXEL_ID', '2089219804702392');
+setEnv('META_AD_ACCOUNT_ID', 'act_2285838831476206');
