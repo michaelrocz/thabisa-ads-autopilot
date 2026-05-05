@@ -198,9 +198,7 @@ function updateDashboard(data) {
   const planStart = new Date('2026-05-01');
   const today = new Date();
   const diffDays = Math.ceil((today - planStart) / (1000 * 60 * 60 * 24)) || 1;
-  const pastSpend = 3144; // Hardcoded spend for previous 4 days
-  const total5dSpend = pastSpend + spendSinceLaunch;
-  setStatValue('survival-day', `Day ${diffDays} of 10 — Last 5 Days Spent: ₹${formatNumber(total5dSpend)}`);
+  setStatValue('survival-day', `Day ${diffDays} of 10 — Last 5 Days Spent: ₹${formatNumber(data.total_spend)}`);
 
   
   // Update sub-stats
