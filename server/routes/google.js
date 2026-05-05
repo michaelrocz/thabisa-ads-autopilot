@@ -69,7 +69,12 @@ router.get('/oauth-start', (req, res) => {
   const { GOOGLE_CLIENT_ID } = process.env;
   if (!GOOGLE_CLIENT_ID) return res.status(400).send('Set GOOGLE_CLIENT_ID in .env first');
   const scope = encodeURIComponent('https://www.googleapis.com/auth/adwords');
-  const redirect = encodeURIComponent(`http://localhost:${process.env.PORT || 8008}/api/google/oauth-callback`);
+  
+  // Use dynamic host for redirect URI to support Vercel
+  const protocol = req.get('x-forwarded-proto') || req.protocol;
+  const host = req.get('host');
+  const redirect = encodeURIComponent(`${protocol}://${host}/api/google/oauth-callback`);
+  
   const url = `https://accounts.google.com/o/oauth2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirect}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
   res.redirect(url);
 });
@@ -79,7 +84,10 @@ router.get('/oauth-callback', async (req, res) => {
   const { code } = req.query;
   if (!code) return res.status(400).send('No code returned from Google');
   try {
-    const redirect = `http://localhost:${process.env.PORT || 3001}/api/google/oauth-callback`;
+    const protocol = req.get('x-forwarded-proto') || req.protocol;
+    const host = req.get('host');
+    const redirect = `${protocol}://${host}/api/google/oauth-callback`;
+    
     const tokenRes = await axios.post('https://oauth2.googleapis.com/token', null, {
       params: {
         code,
