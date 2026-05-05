@@ -212,7 +212,7 @@ function updateDashboard(data) {
 
   const spendSub = document.querySelector('#stat-spend + .stat-sub');
   if (spendSub) {
-    spendSub.textContent = `₹${(data.total_spend/7).toFixed(0)} avg daily`;
+    spendSub.textContent = `₹${(data.total_spend/5).toFixed(0)} avg daily`;
   }
 
   const meta = data.platforms.meta;
