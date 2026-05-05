@@ -144,6 +144,8 @@ function enrichInsightRow(row) {
     reach: parseInt(row.reach || 0),
     purchases,
     purchase_value: purchaseValue.toFixed(2),
+    add_to_cart: getAddToCartCount(row.actions),
+    add_to_cart_value: getAddToCartValue(row.action_values).toFixed(2),
     roas: parseFloat(roas.toFixed(2)),
     cpp: cpp ? parseFloat(cpp.toFixed(2)) : null,
     health_status: healthStatus,
@@ -165,6 +167,22 @@ function getPurchaseCount(actions = []) {
     a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
   );
   return purchase ? parseInt(purchase.value || 0) : 0;
+}
+
+function getAddToCartValue(actionValues = []) {
+  if (!Array.isArray(actionValues)) return 0;
+  const atc = actionValues.find(a =>
+    a.action_type === 'add_to_cart' || a.action_type === 'offsite_conversion.fb_pixel_add_to_cart'
+  );
+  return atc ? parseFloat(atc.value || 0) : 0;
+}
+
+function getAddToCartCount(actions = []) {
+  if (!Array.isArray(actions)) return 0;
+  const atc = actions.find(a =>
+    a.action_type === 'add_to_cart' || a.action_type === 'offsite_conversion.fb_pixel_add_to_cart'
+  );
+  return atc ? parseInt(atc.value || 0) : 0;
 }
 
 // ── SUMMARY (FOR DASHBOARD) ─────────────────────────────────
@@ -212,6 +230,7 @@ async function getSummary() {
     total_spend: parseFloat(totalSpend.toFixed(2)),
     total_spend_today: parseFloat(totalSpendToday.toFixed(2)),
     total_revenue: parseFloat(totalRevenue.toFixed(2)),
+    total_atc_value: parseFloat(insights.reduce((sum, r) => sum + parseFloat(r.add_to_cart_value || 0), 0).toFixed(2)),
     blended_roas: parseFloat(roas.toFixed(2)),
     total_purchases: purchases,
     avg_cpp: avgCpp ? parseFloat(avgCpp.toFixed(2)) : null,

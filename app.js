@@ -186,6 +186,7 @@ function updateDashboard(data) {
 
   setStatValue('stat-spend', '₹' + formatNumber(data.total_spend));
   setStatValue('stat-revenue', '₹' + formatNumber(data.total_revenue));
+  setStatValue('stat-atc', '₹' + formatNumber(data.total_atc_value));
   
   const metaPurchases = data.platforms?.meta?.total_purchases || 0;
   const googleConversions = data.platforms?.google?.total_conversions || 0;

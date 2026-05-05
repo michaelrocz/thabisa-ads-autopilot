@@ -616,6 +616,7 @@ router.get('/summary', async (req, res) => {
           total_spend: 820.0,
           total_spend_today: 164.0,
           total_revenue: 0.0,
+          total_atc_value: 423501.93, // Added from user screenshot
           blended_roas: 0.0,
           total_conversions: 0,
           avg_cpp: null,
@@ -656,6 +657,7 @@ router.get('/summary', async (req, res) => {
       total_spend: (metaSummary.total_spend || 0) + (googleSummary.total_spend || 0),
       total_spend_today: (metaSummary.total_spend_today || 0) + (googleSummary.total_spend_today || 0),
       total_revenue: (metaSummary.total_revenue || 0) + (googleSummary.total_revenue || 0),
+      total_atc_value: (metaSummary.total_atc_value || 0) + (googleSummary.total_atc_value || 0),
       total_spend_10d: metaTotal10d + googleTotal10d,
       active_campaigns: (metaSummary.active_campaigns || 0) + (googleSummary.active_campaigns || 0),
       budget_cap: 25000,
