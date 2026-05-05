@@ -132,9 +132,16 @@ async function getCampaignMetrics(dateRange = 'LAST_7_DAYS') {
 
 // ── SUMMARY ─────────────────────────────────────────────────
 async function getSummary() {
+  const now = new Date();
+  const fiveDaysAgo = new Date(now);
+  fiveDaysAgo.setDate(now.getDate() - 4);
+  
+  const formatDate = (d) => d.toISOString().split('T')[0].replace(/-/g, '');
+  const range = `${formatDate(fiveDaysAgo)},${formatDate(now)}`;
+
   const campaigns = await getCampaigns();
   const [metrics, metricsToday] = await Promise.all([
-    getCampaignMetrics('LAST_7_DAYS'),
+    getCampaignMetrics(range),
     getCampaignMetrics('TODAY').catch(() => [])
   ]);
 
@@ -153,7 +160,7 @@ async function getSummary() {
   return {
     platform: 'google',
     currency: process.env.CURRENCY || 'INR',
-    period: 'last_7d',
+    period: 'last_5d',
     total_spend: parseFloat(totalSpend.toFixed(2)),
     total_spend_today: parseFloat(totalSpendToday.toFixed(2)),
     total_revenue: parseFloat(totalRevenue.toFixed(2)),

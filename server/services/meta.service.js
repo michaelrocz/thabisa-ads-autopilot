@@ -83,9 +83,8 @@ async function getAdSets(campaignId = null) {
 }
 
 // ── INSIGHTS (PERFORMANCE METRICS) ──────────────────────────
-async function getInsights(datePreset = 'last_7d', level = 'campaign') {
-  const data = await api(`/${ACCOUNT_ID}/insights`, {
-    date_preset: datePreset,
+async function getInsights(datePreset = 'last_7d', level = 'campaign', timeRange = null) {
+  const params = {
     level,
     fields: [
       'campaign_id', 'campaign_name', 'adset_id', 'adset_name',
@@ -93,7 +92,15 @@ async function getInsights(datePreset = 'last_7d', level = 'campaign') {
       'actions', 'action_values', 'cost_per_action_type'
     ].join(','),
     limit: 200
-  });
+  };
+
+  if (timeRange) {
+    params.time_range = JSON.stringify(timeRange);
+  } else {
+    params.date_preset = datePreset;
+  }
+
+  const data = await api(`/${ACCOUNT_ID}/insights`, params);
   return (data.data || []).map(row => enrichInsightRow(row));
 }
 
@@ -162,8 +169,15 @@ function getPurchaseCount(actions = []) {
 
 // ── SUMMARY (FOR DASHBOARD) ─────────────────────────────────
 async function getSummary() {
+  const now = new Date();
+  const fiveDaysAgo = new Date(now);
+  fiveDaysAgo.setDate(now.getDate() - 4); // Including today makes it 5 days (4 full past + today)
+  
+  const formatDate = (d) => d.toISOString().split('T')[0];
+  const timeRange = { since: formatDate(fiveDaysAgo), until: formatDate(now) };
+
   const [insights, insightsToday, campaigns] = await Promise.all([
-    getInsights('last_7d', 'campaign'),
+    getInsights(null, 'campaign', timeRange),
     getInsights('today', 'campaign').catch(() => []),
     getCampaigns()
   ]);
@@ -194,7 +208,7 @@ async function getSummary() {
     platform: 'meta',
     account_id: ACCOUNT_ID,
     currency: process.env.CURRENCY || 'INR',
-    period: 'last_7d',
+    period: 'last_5d',
     total_spend: parseFloat(totalSpend.toFixed(2)),
     total_spend_today: parseFloat(totalSpendToday.toFixed(2)),
     total_revenue: parseFloat(totalRevenue.toFixed(2)),

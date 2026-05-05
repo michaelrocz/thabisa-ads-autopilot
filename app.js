@@ -198,7 +198,9 @@ function updateDashboard(data) {
   const planStart = new Date('2026-05-01');
   const today = new Date();
   const diffDays = Math.ceil((today - planStart) / (1000 * 60 * 60 * 24)) || 1;
-  setStatValue('survival-day', `Day ${diffDays} of 10 — Last 4 Days Spent: ₹3,144`);
+  const pastSpend = 3144; // Hardcoded spend for previous 4 days
+  const total5dSpend = pastSpend + spendSinceLaunch;
+  setStatValue('survival-day', `Day ${diffDays} of 10 — Last 5 Days Spent: ₹${formatNumber(total5dSpend)}`);
 
   
   // Update sub-stats
@@ -261,7 +263,7 @@ function renderCampaignTable(campaigns) {
     const div = document.createElement('div');
     div.id = 'live-campaign-table-wrap';
     div.innerHTML = `
-      <div class="section-label mb-16" style="margin-top:28px">Live Campaign Performance — All Platforms (7d)</div>
+      <div class="section-label mb-16" style="margin-top:28px">Live Campaign Performance — All Platforms (5d)</div>
       <div style="overflow-x:auto">
         <table id="live-campaign-table" style="width:100%;border-collapse:collapse;font-size:0.78rem"></table>
       </div>`;
