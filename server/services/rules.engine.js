@@ -6,11 +6,14 @@ const metaService = require('./meta.service');
 const googleService = require('./google.service');
 const notifier = require('./notifier');
 
-// ── SURVIVAL CONFIGURATION ──────────────────────────────────
+// ── SURVIVAL CONFIGURATION (RESCUE MODE) ─────────────────────
 const TARGET_ROAS = 3.0;
+const MIN_VIABLE_ROAS = 1.5; // ABSOLUTE MINIMUM TO STAY ACTIVE
 const TARGET_CPP = 1200; 
-const KILLSWITCH_THRESHOLD = 1500; 
-const MIN_SPEND_FOR_AUDIT = 300;
+const KILLSWITCH_THRESHOLD = 500; // PAUSE FASTER (WAS 1500)
+const MIN_SPEND_FOR_AUDIT = 200;
+const GLOBAL_BUDGET_CAP = 25000; // HARD LIMIT FOR 10 DAYS
+const REMAINING_DAILY_LIMIT = 1200; // ₹6,000 / 5 DAYS
 const DRY_RUN = process.env.DRY_RUN !== 'false';
 
 const roasHistory = {}; 
@@ -59,15 +62,24 @@ async function runMetaRules() {
       const currentSpend = parseFloat(campaign.spend || 0);
       const purchases = parseInt(campaign.purchases || 0);
 
-      // 1. SCALE: ROAS ≥ 3.0
+      // 1. GUARDIAN PAUSE: ROAS < 1.5x (RESCUE MODE)
+      if (currentSpend > MIN_SPEND_FOR_AUDIT && campaign.roas < MIN_VIABLE_ROAS) {
+        const result = await metaService.pauseAdSet(campaign.adset_id || campId, `Guardian: Low ROAS ${campaign.roas}x`);
+        actions.push({ type: 'PAUSE_CAMPAIGN', campaign: campaign.campaign_name, roas: campaign.roas, result });
+        await pushAlert('CRITICAL', `Rescue Mode: ${campaign.campaign_name} paused (ROAS ${campaign.roas}x < 1.5x)`);
+        continue; // Skip other rules for this campaign
+      }
+
+      // 2. SCALE: ROAS ≥ 3.0
       if (campaign.roas >= TARGET_ROAS) {
         const currentBudget = parseFloat(campaign.daily_budget) || 1100;
-        const result = await metaService.scaleBudget(campId, currentBudget, `High ROAS ${campaign.roas}x`);
+        // Limit scaling budget to fit the daily limit
+        const result = await metaService.scaleBudget(campId, Math.min(currentBudget, REMAINING_DAILY_LIMIT), `High ROAS ${campaign.roas}x`);
         actions.push({ type: 'SCALE_BUDGET', campaign: campaign.campaign_name, roas: campaign.roas, result });
         await pushAlert('INFO', `Scaling: ${campaign.campaign_name} (ROAS ${campaign.roas}x)`);
       }
 
-      // 2. KILLSWITCH: Spend > ₹1,500 with 0 sales
+      // 3. KILLSWITCH: Spend > ₹500 with 0 sales
       if (purchases === 0 && currentSpend > KILLSWITCH_THRESHOLD) {
         const result = await metaService.pauseAdSet(campaign.adset_id || campId, `Killswitch: ₹${currentSpend} spent with 0 sales`);
         actions.push({ type: 'PAUSE_CAMPAIGN', campaign: campaign.campaign_name, spend: currentSpend, result });
@@ -118,7 +130,15 @@ async function runGoogleRules() {
       const currentSpend = parseFloat(campaign.spend || 0);
       const conversions = parseInt(campaign.conversions || 0);
 
-      // 1. KILLSWITCH: Spend > ₹1,500 with 0 conversions
+      // 1. GUARDIAN PAUSE: ROAS < 1.5x (RESCUE MODE)
+      if (currentSpend > MIN_SPEND_FOR_AUDIT && campaign.roas < MIN_VIABLE_ROAS) {
+        const result = await googleService.pauseCampaign(campId, `Guardian: Low ROAS ${campaign.roas}x`);
+        actions.push({ type: 'PAUSE_GOOGLE', campaign: campaign.campaign_name, roas: campaign.roas, result });
+        await pushAlert('CRITICAL', `Rescue Mode: Google ${campaign.campaign_name} paused (ROAS ${campaign.roas}x < 1.5x)`);
+        continue;
+      }
+
+      // 2. KILLSWITCH: Spend > ₹500 with 0 conversions
       if (conversions === 0 && currentSpend > KILLSWITCH_THRESHOLD) {
         const result = await googleService.pauseCampaign(campId, `Killswitch: ₹${currentSpend} spent with 0 conversions`);
         actions.push({ type: 'PAUSE_GOOGLE', campaign: campaign.campaign_name, spend: currentSpend, result });
@@ -143,9 +163,55 @@ async function runGoogleRules() {
   };
 }
 
+// ── GLOBAL GUARDIAN ─────────────────────────────────────────
+async function checkGlobalGuardian() {
+  logger.info('Checking Global Guardian constraints...');
+  const now = new Date();
+  const planStart = new Date('2026-05-01');
+  const formatDate = (d) => d.toISOString().split('T')[0];
+  const timeRange = { since: formatDate(planStart), until: formatDate(now) };
+
+  const [metaSum, googleSum] = await Promise.all([
+    metaService.getInsights(null, 'campaign', timeRange).catch(() => []),
+    googleService.getSummary().catch(() => ({ total_spend: 0 })) // Fallback for Google
+  ]);
+
+  const metaTotal = metaSum.reduce((sum, r) => sum + parseFloat(r.spend), 0);
+  const googleTotal = googleSum.total_spend || 0;
+  const grandTotal = metaTotal + googleTotal;
+
+  logger.info(`Global Guardian: Total 10-Day Spend to date: ₹${grandTotal}`);
+
+  if (grandTotal >= GLOBAL_BUDGET_CAP) {
+    await pushAlert('CRITICAL', `GLOBAL BUDGET CAP REACHED (₹${grandTotal}). SHUTTING DOWN ALL SPENDING.`);
+    
+    // Pause ALL active Meta campaigns
+    const metaCamps = await metaService.getCampaigns();
+    for (const c of metaCamps) {
+      if (c.status === 'ACTIVE') {
+        await metaService.pauseAdSet(c.id, 'GLOBAL BUDGET CAP EXCEEDED');
+      }
+    }
+
+    // Pause ALL active Google campaigns
+    const googleCamps = await googleService.getCampaigns();
+    for (const c of googleCamps) {
+      if (c.status === 2) { // ENABLED
+        await googleService.pauseCampaign(c.id, 'GLOBAL BUDGET CAP EXCEEDED');
+      }
+    }
+    return true; // Cap reached
+  }
+  return false; // Cap not reached
+}
+
 // ── FULL AUDIT ───────────────────────────────────────────────
 async function runFullAudit() {
   logger.info('=== THABISA AUTOPILOT: FULL AUDIT STARTING ===');
+  
+  const capReached = await checkGlobalGuardian();
+  if (capReached) return { status: 'SHUTDOWN', message: 'Global Budget Cap Reached' };
+
   const [metaResult, googleResult] = await Promise.allSettled([
     runMetaRules(),
     runGoogleRules()

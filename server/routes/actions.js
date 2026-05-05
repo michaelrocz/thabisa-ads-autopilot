@@ -44,8 +44,9 @@ router.get('/survival', async (req, res) => {
              await axios.post(`https://graph.facebook.com/v21.0/${c.id}?access_token=${meta.getToken()}`, { status: 'PAUSED' });
           } catch(e) { log('Failed to pause Meta: ' + c.name); }
         } else {
-          const newBudget = c.name.includes('RETARGETING') ? 15000 : 17500;
-          log(`UPDATING BUDGET META: ${c.name} to ₹${newBudget/100}/day`);
+          // Strict Daily Limit: ₹1,200 total / campaigns
+          const newBudget = 30000; // ₹300 per campaign to stay safe
+          log(`UPDATING BUDGET META (STRICT): ${c.name} to ₹${newBudget/100}/day`);
           const axios = require('axios');
           try {
              await axios.post(`https://graph.facebook.com/v21.0/${c.id}?access_token=${meta.getToken()}`, { daily_budget: newBudget });
@@ -642,11 +643,22 @@ router.get('/summary', async (req, res) => {
       })
     ]);
 
+    // Calculate 10-day total for Guardian logic
+    const now = new Date();
+    const planStart = new Date('2026-05-01');
+    const formatDate = (d) => d.toISOString().split('T')[0];
+    const timeRange = { since: formatDate(planStart), until: formatDate(now) };
+    const meta10d = await meta.getInsights(null, 'campaign', timeRange).catch(() => []);
+    const metaTotal10d = meta10d.reduce((sum, r) => sum + parseFloat(r.spend), 0);
+    const googleTotal10d = googleSummary.total_spend || 0; // Simplified for now
+
     const blended = {
       total_spend: (metaSummary.total_spend || 0) + (googleSummary.total_spend || 0),
       total_spend_today: (metaSummary.total_spend_today || 0) + (googleSummary.total_spend_today || 0),
       total_revenue: (metaSummary.total_revenue || 0) + (googleSummary.total_revenue || 0),
+      total_spend_10d: metaTotal10d + googleTotal10d,
       active_campaigns: (metaSummary.active_campaigns || 0) + (googleSummary.active_campaigns || 0),
+      budget_cap: 25000,
       platforms: {
         meta: metaSummary,
         google: googleSummary

@@ -198,7 +198,9 @@ function updateDashboard(data) {
   const planStart = new Date('2026-05-01');
   const today = new Date();
   const diffDays = Math.ceil((today - planStart) / (1000 * 60 * 60 * 24)) || 1;
-  setStatValue('survival-day', `Day ${diffDays} of 10 — Last 5 Days Spent: ₹${formatNumber(data.total_spend)}`);
+  const remaining = Math.max(0, (data.budget_cap || 25000) - data.total_spend_10d);
+  const statusIcon = remaining < 1000 ? '⚠️' : '🛡️';
+  setStatValue('survival-day', `Day ${diffDays} of 10 — Remaining: ₹${formatNumber(remaining)} (Guardian Active ${statusIcon})`);
 
   
   // Update sub-stats
@@ -342,12 +344,18 @@ function updateProgressBar(id, pct, label, color) {
 }
 
 function updateAlertBadge(alerts) {
-  const unread = alerts.filter(a => !a.read).length;
-  const el = document.getElementById('stat-alerts');
-  if (el) el.textContent = unread;
+  const alertsValue = document.getElementById('stat-alerts');
+  if (alertsValue) {
+    const alertCount = data.platforms.meta.flagged_count || 0;
+    alertsValue.textContent = alertCount;
+    if (data.total_spend_10d > 24000) {
+      alertsValue.textContent = 'CRITICAL';
+      alertsValue.parentElement.classList.add('pulse-red');
+    }
+  }
   // colour the card red if critical alerts
   const hasCritical = alerts.some(a => !a.read && a.level === 'CRITICAL');
-  const card = el?.closest('.stat-card');
+  const card = document.getElementById('stat-alerts')?.closest('.stat-card');
   if (card) card.style.borderTopColor = hasCritical ? 'var(--red)' : '';
 }
 
