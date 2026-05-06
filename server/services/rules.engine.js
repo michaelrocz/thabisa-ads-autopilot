@@ -212,6 +212,25 @@ async function runFullAudit() {
   const capReached = await checkGlobalGuardian();
   if (capReached) return { status: 'SHUTDOWN', message: 'Global Budget Cap Reached' };
 
+  // ── CART RECOVERY PRIORITY (RESCUE MODE) ──
+  try {
+    const summary = await metaService.getSummary();
+    const remainingBudget = GLOBAL_BUDGET_CAP - summary.total_spend_10d;
+    
+    if (summary.total_atc_value > 100000 && remainingBudget > 1000) {
+      logger.info(`High ATC Value detected (₹${summary.total_atc_value}). Prioritizing Retargeting.`);
+      const allCamps = await metaService.getCampaigns();
+      const retargeting = allCamps.find(c => c.name.includes('RETARGETING'));
+      
+      if (retargeting && retargeting.status !== 'ACTIVE') {
+        await metaService.scaleBudget(retargeting.id, 50000, 'Activating Retargeting for Cart Recovery');
+        await pushAlert('INFO', `Guardian: Activated Retargeting campaign to capture ₹${summary.total_atc_value} in carts.`);
+      }
+    }
+  } catch (err) {
+    logger.error('Cart Recovery activation failed', { error: err.message });
+  }
+
   const [metaResult, googleResult] = await Promise.allSettled([
     runMetaRules(),
     runGoogleRules()
