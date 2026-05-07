@@ -11,7 +11,7 @@ const BASE_URL = `https://graph.facebook.com/${process.env.META_API_VERSION || '
 const ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID || 'act_2285838831476206'; 
 const PIXEL_ID = '2089219804702392';
 const APP_ID = '4198582757119959';
-const DRY_RUN = process.env.DRY_RUN !== 'false';
+const DRY_RUN = process.env.DRY_RUN === 'true'; // DEFAULT TO LIVE MODE
 
 // ── HELPERS ─────────────────────────────────────────────────
 function getToken() {
