@@ -12,8 +12,8 @@ const MIN_VIABLE_ROAS = 1.5; // ABSOLUTE MINIMUM TO STAY ACTIVE
 const TARGET_CPP = 1200; 
 const KILLSWITCH_THRESHOLD = 500; // PAUSE FASTER (WAS 1500)
 const MIN_SPEND_FOR_AUDIT = 200;
-const GLOBAL_BUDGET_CAP = 25000; // HARD LIMIT FOR 10 DAYS
-const REMAINING_DAILY_LIMIT = 1200; // ₹6,000 / 5 DAYS
+const GLOBAL_BUDGET_CAP = 150000; // Updated to accommodate previous spend + new activity
+const REMAINING_DAILY_LIMIT = 2000; // New daily limit for active monitoring
 const DRY_RUN = process.env.DRY_RUN === 'true'; // DEFAULT TO LIVE MODE
 
 const roasHistory = {}; 
