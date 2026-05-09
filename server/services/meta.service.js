@@ -280,15 +280,25 @@ async function pauseAdSet(adSetId, reason) {
 }
 
 async function scaleBudget(campaignId, currentBudget, reason) {
-  const targetCpp = 1200; 
   const pct = 0.20; 
-  const newBudget = Math.round(currentBudget * (1 + pct));
+  // currentBudget from Meta is already in 'cents/paise' (e.g. 50000 for ₹500)
+  // We MUST NOT multiply by 100 again.
+  let newBudgetPaise = Math.round(currentBudget * (1 + pct));
+  
+  // SAFETY CEILING: Never allow the autopilot to set a budget > ₹2,000 (200,000 paise)
+  const HARD_CEILING_PAISE = 200000;
+  if (newBudgetPaise > HARD_CEILING_PAISE) {
+    logger.warn(`Guardian: Scale request for ${campaignId} capped at ₹2,000 ceiling.`);
+    newBudgetPaise = HARD_CEILING_PAISE;
+  }
+
   logger.logAction({
     platform: 'META', objectId: campaignId, action: 'SCALE_BUDGET',
-    reason, oldValue: currentBudget, newValue: newBudget
+    reason, oldValue: currentBudget, newValue: newBudgetPaise
   });
-  if (DRY_RUN) return { dry_run: true, action: 'SCALE_BUDGET', id: campaignId, old: currentBudget, new: newBudget };
-  return apiPost(`/${campaignId}`, { daily_budget: newBudget * 100 });
+
+  if (DRY_RUN) return { dry_run: true, action: 'SCALE_BUDGET', id: campaignId, old: currentBudget, new: newBudgetPaise };
+  return apiPost(`/${campaignId}`, { daily_budget: newBudgetPaise });
 }
 
 async function getAdSets(campaignId) {
