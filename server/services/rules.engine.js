@@ -14,7 +14,7 @@ const KILLSWITCH_THRESHOLD = 500; // PAUSE FASTER (WAS 1500)
 const MIN_SPEND_FOR_AUDIT = 200;
 const GLOBAL_BUDGET_CAP = 150000; // Updated to accommodate previous spend + new activity
 const REMAINING_DAILY_LIMIT = 2000; // New daily limit for active monitoring
-const DRY_RUN = process.env.DRY_RUN === 'true'; // DEFAULT TO LIVE MODE
+const DRY_RUN = true; // SYSTEM PAUSED: MONITORING ONLY
 
 const roasHistory = {}; 
 

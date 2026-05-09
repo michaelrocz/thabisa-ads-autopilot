@@ -3,7 +3,7 @@
 // ============================================================
 const logger = require('../utils/logger');
 
-const DRY_RUN = process.env.DRY_RUN === 'true'; // DEFAULT TO LIVE MODE
+const DRY_RUN = true; // SYSTEM PAUSED: MONITORING ONLY
 
 function getClient() {
   const { GoogleAdsApi } = require('google-ads-api');
